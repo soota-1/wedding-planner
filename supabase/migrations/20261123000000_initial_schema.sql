@@ -150,11 +150,20 @@ ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can access their workspaces" ON workspaces
     FOR ALL USING (is_workspace_member(id));
 
+CREATE POLICY "Users can create workspaces" ON workspaces
+    FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+
 CREATE POLICY "Users can access their workspace members" ON workspace_members
     FOR ALL USING (is_workspace_member(workspace_id));
 
+CREATE POLICY "Users can insert workspace members" ON workspace_members
+    FOR INSERT WITH CHECK (user_id = auth.uid() OR is_workspace_member(workspace_id));
+
 CREATE POLICY "Users can access their workspace invites" ON workspace_invites
     FOR ALL USING (is_workspace_member(workspace_id));
+
+CREATE POLICY "Users can query pending invites" ON workspace_invites
+    FOR SELECT USING (status = 'pending' OR is_workspace_member(workspace_id));
 
 CREATE POLICY "Users can access their budgets" ON budgets
     FOR ALL USING (is_workspace_member(workspace_id));
@@ -181,6 +190,19 @@ CREATE POLICY "Users can access their vendors" ON vendors
 
 CREATE POLICY "Users can access their transactions" ON transactions
     FOR ALL USING (is_workspace_member(workspace_id));
+
+-- Realtime Publication & Replica Identity
+ALTER TABLE tasks REPLICA IDENTITY FULL;
+ALTER TABLE transactions REPLICA IDENTITY FULL;
+ALTER TABLE vendors REPLICA IDENTITY FULL;
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE workspaces, tasks, transactions, vendors, checklist_categories, budget_categories, budgets;
+    END IF;
+END;
+$$;
 
 -- Trigger: Dynamic Date Shifting on Wedding Date Update
 CREATE OR REPLACE FUNCTION shift_template_task_due_dates()

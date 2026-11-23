@@ -50,7 +50,8 @@ export class VendorService {
     const { data, error } = await supabase
       .from('vendors')
       .update({ status: nextStatus })
-      .eq('id', vendorId);
+      .eq('id', vendorId)
+      .select();
 
     if (error) {
       throw error;
@@ -63,7 +64,8 @@ export class VendorService {
     const { data, error } = await supabase
       .from('vendors')
       .update({ budget_category_id: categoryId })
-      .eq('id', vendorId);
+      .eq('id', vendorId)
+      .select();
 
     if (error) {
       throw error;

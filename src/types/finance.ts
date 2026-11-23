@@ -57,6 +57,14 @@ export interface ContributorBreakdown {
   [key: string]: number;
 }
 
+export interface CategorySummary {
+  allocated: number;
+  committed: number;
+  spent: number;
+  isOverBudget: boolean;
+  overBudgetAmount: number;
+}
+
 export interface BudgetSummary {
   targetBudget: number;
   cashSpent: number;
@@ -66,4 +74,5 @@ export interface BudgetSummary {
   isOverBudget: boolean;
   overBudgetAmount: number;
   contributions: ContributorBreakdown;
+  categorySummaries: Record<string, CategorySummary>;
 }

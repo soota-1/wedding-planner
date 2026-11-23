@@ -1,5 +1,5 @@
 import { calculateBudgetSummary } from '../../src/services/budgetCalculator';
-import { Budget, Vendor, Transaction } from '../../src/types/finance';
+import { Budget, Vendor, Transaction, BudgetCategory } from '../../src/types/finance';
 
 describe('calculateBudgetSummary', () => {
   it('correctly separates paid cash from committed liabilities without double counting', () => {
@@ -44,7 +44,7 @@ describe('calculateBudgetSummary', () => {
       { id: 't1', amount: 10000000, paymentStatus: 'paid', paidBy: 'groom' },
       { id: 't2', amount: 15000000, paymentStatus: 'paid', paidBy: 'bride' },
       { id: 't3', amount: 5000000, paymentStatus: 'paid', paidBy: 'family_groom' },
-      { id: 't4', amount: 2000000, paymentStatus: 'pending', paidBy: 'groom' }, // pending not in cash paid
+      { id: 't4', amount: 2000000, paymentStatus: 'pending', paidBy: 'groom' },
     ];
 
     const result = calculateBudgetSummary(budget, vendors, transactions);
@@ -52,5 +52,45 @@ describe('calculateBudgetSummary', () => {
     expect(result.contributions.groom).toBe(10000000);
     expect(result.contributions.bride).toBe(15000000);
     expect(result.contributions.family_groom).toBe(5000000);
+  });
+
+  it('handles payments exceeding contract value and uncommitted vendor payments without under-reporting commitment', () => {
+    const budget: Budget = { targetBudget: 50000000 };
+    // Vendor contract 40M, but paid transactions total 55M
+    const vendors: Vendor[] = [
+      { id: 'v1', name: 'Katering', contractValue: 40000000, status: 'booked' },
+      { id: 'v2', name: 'Fotografer Negosiasi', contractValue: 0, status: 'negotiating' },
+    ];
+    const transactions: Transaction[] = [
+      { id: 't1', vendorId: 'v1', amount: 55000000, paymentStatus: 'paid', paidBy: 'groom' },
+      { id: 't2', vendorId: 'v2', amount: 5000000, paymentStatus: 'paid', paidBy: 'bride' },
+    ];
+
+    const result = calculateBudgetSummary(budget, vendors, transactions);
+    expect(result.cashSpent).toBe(60000000);
+    expect(result.totalCommitted).toBe(60000000);
+    expect(result.isOverBudget).toBe(true);
+    expect(result.overBudgetAmount).toBe(10000000); // 60M - 50M
+  });
+
+  it('calculates category-level breakdown and flags category over-budget', () => {
+    const budget: Budget = { targetBudget: 100000000 };
+    const categories: BudgetCategory[] = [
+      { id: 'cat-1', workspaceId: 'w1', name: 'Katering', allocatedAmount: 40000000 },
+      { id: 'cat-2', workspaceId: 'w1', name: 'Dekorasi', allocatedAmount: 20000000 },
+    ];
+    const vendors: Vendor[] = [
+      { id: 'v1', name: 'Vendor Katering', contractValue: 50000000, status: 'booked', budgetCategoryId: 'cat-1' },
+      { id: 'v2', name: 'Vendor Dekor', contractValue: 15000000, status: 'booked', budgetCategoryId: 'cat-2' },
+    ];
+    const transactions: Transaction[] = [
+      { id: 't1', vendorId: 'v1', budgetCategoryId: 'cat-1', amount: 10000000, paymentStatus: 'paid', paidBy: 'groom' }
+    ];
+
+    const result = calculateBudgetSummary(budget, vendors, transactions, categories);
+    expect(result.categorySummaries['cat-1']).toBeDefined();
+    expect(result.categorySummaries['cat-1'].isOverBudget).toBe(true); // 50M committed > 40M allocated
+    expect(result.categorySummaries['cat-1'].overBudgetAmount).toBe(10000000);
+    expect(result.categorySummaries['cat-2'].isOverBudget).toBe(false);
   });
 });

@@ -6,20 +6,44 @@ export function subscribeToWorkspaceChanges(
 ): () => void {
   const channelName = `workspace-${workspaceId}`;
 
-  const channel = supabase
-    .channel(channelName)
-    .on(
+  let channel = supabase.channel(channelName);
+
+  // 1. Subscribe to workspace record changes (id = workspaceId)
+  channel = channel.on(
+    'postgres_changes' as any,
+    {
+      event: '*',
+      schema: 'public',
+      table: 'workspaces',
+      filter: `id=eq.${workspaceId}`,
+    },
+    (payload: any) => onUpdate({ ...payload, table: 'workspaces' })
+  );
+
+  // 2. Subscribe to child tables filtered by workspace_id
+  const childTables = [
+    'tasks',
+    'transactions',
+    'vendors',
+    'checklist_categories',
+    'budget_categories',
+    'budgets',
+  ];
+
+  childTables.forEach((table) => {
+    channel = channel.on(
       'postgres_changes' as any,
       {
         event: '*',
         schema: 'public',
+        table,
         filter: `workspace_id=eq.${workspaceId}`,
       },
-      (payload: any) => {
-        onUpdate(payload);
-      }
-    )
-    .subscribe();
+      (payload: any) => onUpdate({ ...payload, table })
+    );
+  });
+
+  channel.subscribe();
 
   return () => {
     supabase.removeChannel(channel);

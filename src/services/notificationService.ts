@@ -52,7 +52,11 @@ export class NotificationService {
     for (const event of events) {
       if (event.isCompleted) continue;
 
-      const dateStr = event.date.toISOString().split('T')[0];
+      const year = event.date.getFullYear();
+      const month = String(event.date.getMonth() + 1).padStart(2, '0');
+      const day = String(event.date.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+
       const payload: NotificationPayload = {
         title: `Pengingat: ${event.title}`,
         body:

@@ -47,15 +47,19 @@ describe('VendorService Operations', () => {
     expect(supabase.from).toHaveBeenCalledWith('vendors');
   });
 
-  it('updates vendor status with validation check', async () => {
+  it('updates vendor status with validation check and returns selected row', async () => {
+    const selectMock = jest.fn().mockResolvedValue({ data: [{ id: 'v1', status: 'booked' }], error: null });
     const updateMock = jest.fn().mockReturnValue({
-      eq: jest.fn().mockResolvedValue({ data: [{ id: 'v1', status: 'booked' }], error: null }),
+      eq: jest.fn().mockReturnValue({
+        select: selectMock,
+      }),
     });
 
     (supabase.from as jest.Mock).mockReturnValue({ update: updateMock });
 
     const result = await VendorService.updateVendorStatus('v1', 'booked', 'negotiating');
     expect(result.success).toBe(true);
+    expect(selectMock).toHaveBeenCalled();
   });
 
   it('throws error on invalid status transition in updateVendorStatus', async () => {

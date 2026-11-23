@@ -37,12 +37,14 @@ describe('mapEventsForTimeline & formatTimelineEvents', () => {
 });
 
 describe('NotificationService scheduling', () => {
-  it('schedules notifications for upcoming events', async () => {
+  it('schedules notifications for upcoming events using local calendar date', async () => {
+    // Local date 12 July 2027
+    const localDate = new Date(2027, 6, 12, 0, 0, 0);
     const events: CalendarEvent[] = [
       {
         id: 'e1',
         title: 'Kanonik',
-        date: new Date('2027-07-12T00:00:00.000Z'),
+        date: localDate,
         type: 'task_deadline',
       },
     ];

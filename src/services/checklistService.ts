@@ -1,9 +1,8 @@
+import { addDays } from 'date-fns';
 import { TemplateTask, Task, TaskWithDueDate } from '../types/checklist';
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
 export function calculateDateWithOffset(baseDate: Date, offsetDays: number): Date {
-  return new Date(baseDate.getTime() + offsetDays * MS_PER_DAY);
+  return addDays(baseDate, offsetDays);
 }
 
 export function generateTaskDueDates(weddingDate: Date, tasks: TemplateTask[]): TaskWithDueDate[] {
@@ -15,8 +14,9 @@ export function generateTaskDueDates(weddingDate: Date, tasks: TemplateTask[]): 
 
 export function shiftUncompletedDueDates(newWeddingDate: Date, currentTasks: Task[]): Task[] {
   return currentTasks.map((task) => {
-    // Hanya geser tugas yang belum selesai dan memiliki offsetDays
-    if (task.status !== 'done' && typeof task.offsetDays === 'number') {
+    // Hanya geser tugas bawaan templat yang belum selesai dan memiliki offsetDays
+    const isTemplate = task.isTemplateItem !== false;
+    if (task.status !== 'done' && isTemplate && typeof task.offsetDays === 'number') {
       return {
         ...task,
         dueDate: calculateDateWithOffset(newWeddingDate, task.offsetDays),
