@@ -6,7 +6,7 @@ Aplikasi mobile kolaboratif *single source of truth* untuk persiapan pernikahan 
 
 ## 🌟 Status Implementasi Fitur
 
-Semua logika bisnis, kalkulasi finansial, modul data tamu & katering, pencatatan angpau/hadiah fisik, aturan kanonik gereja Katolik, validasi vendor, dan skema database **sudah selesai diimplementasikan 100%** dengan pendekatan *Test-Driven Development (TDD)* dan lulus seluruh **14 test suites (51 tests)**.
+Semua logika bisnis, kalkulasi finansial, modul data tamu & katering, pencatatan angpau/hadiah fisik, aturan kanonik gereja Katolik, validasi vendor, skema database, serta **seluruh antarmuka mobile UI berbasis Expo Router SDK 52** **sudah selesai diimplementasikan 100%** dengan pendekatan *Test-Driven Development (TDD)* dan lulus seluruh **20 test suites (69 tests)**.
 
 ### 📋 Ringkasan Modul Terimplementasi
 
@@ -23,6 +23,8 @@ Semua logika bisnis, kalkulasi finansial, modul data tamu & katering, pencatatan
 | **9. Manajemen Tamu, RSVP & Pax Katering** | Pengelompokan tamu (pria, wanita, bersama), pelacakan status RSVP, dan kalkulator konfirmasi pax katering akurat (*confirmed attending pax*). | ✅ Selesai (Fase 2) | [`src/services/guestService.ts`](file:///c:/project/wedding-tracker/src/services/guestService.ts), [`src/types/guest.ts`](file:///c:/project/wedding-tracker/src/types/guest.ts) |
 | **10. Buku Besar Angpau & Hadiah Fisik** | Dedicated Gift Ledger memisahkan dana tunai/transfer dari kado fisik, rekap per penerima (Octa, Jenesia, keluarga), dan pelacakan status ucapan terima kasih. | ✅ Selesai (Fase 2) | [`src/services/giftService.ts`](file:///c:/project/wedding-tracker/src/services/giftService.ts), [`src/types/gift.ts`](file:///c:/project/wedding-tracker/src/types/gift.ts) |
 | **11. Kepatuhan Dokumen Kanonik Katolik** | Validasi aturan kanonik surat baptis terbaru (maksimal 180 hari / 6 bulan sebelum hari H), pelacakan berkas KPP & sipil, serta indikator kesiapan kepatuhan. | ✅ Selesai (Fase 2) | [`src/services/documentService.ts`](file:///c:/project/wedding-tracker/src/services/documentService.ts), [`src/types/document.ts`](file:///c:/project/wedding-tracker/src/types/document.ts) |
+| **12. Design System & UI Primitives** | Palet warna tema pernikahan elegan (*Warm Ivory, Terracotta/Rose Gold, Deep Navy, Champagne Gold*) & komponen reusable (`Card`, `Header`, `StatCard`, `ProgressBar`, `Badge`, `SegmentedControl`). | ✅ Selesai (Fase 3) | [`src/theme/`](file:///c:/project/wedding-tracker/src/theme/), [`src/components/common/`](file:///c:/project/wedding-tracker/src/components/common/) |
+| **13. Mobile UI Navigation (Expo Router)** | Navigasi Bottom Tabs Expo Router SDK 52 dengan 5 layar visual: Dashboard, Checklist, Anggaran, Tamu & Angpau, Dokumen. | ✅ Selesai (Fase 3) | [`app/`](file:///c:/project/wedding-tracker/app/) |
 
 ---
 
@@ -40,19 +42,28 @@ Menjalankan simulasi manajemen tamu & RSVP, kalkulasi pax katering resepsi, reka
 npm run demo:phase2
 ```
 
-**Output yang akan Anda lihat pada Demo Fase 2:**
-- **Manajemen Tamu & RSVP**: Estimasi kuota pax undangan vs realisasi pax hadir terkonfirmasi (angka pasti untuk konfirmasi porsi katering), serta pembagian sisi keluarga.
-- **Buku Besar Angpau (Gift Ledger)**: Total nominal uang tunai & transfer terkumpul, rekap penerimaan per mempelai/keluarga, daftar hadiah fisik (misal mesin kopi), dan pelacakan kartu ucapan terima kasih (*thank you notes*).
-- **Kepatuhan Dokumen Kanonik Katolik**: Pengecekan otomatis surat baptis (surat baptis terbit $\le$ 180 hari sebelum hari H dinyatakan sah; surat baptis $> 180$ hari otomatis ditandai kedaluwarsa dan wajib dicetak ulang di paroki asal), serta persentase kesiapan dokumen pernikahan.
+### 3. Menjalankan Demo Simulasi Mobile UI Fase 3 (Expo Router)
+Menjalankan simulasi rendering visual dan navigasi 5 layar utama aplikasi mobile (*Warm Ivory & Rose Gold Design System*):
+```bash
+npm run demo:ui
+```
+
+**Output yang akan Anda lihat pada Demo Fase 3 (Mobile UI):**
+- **Tema & Nuansa Pernikahan**: Warm Ivory (`#FDFBF7`), Terracotta/Rose Gold (`#C57B57`), Champagne Gold (`#D4AF37`), dan Midnight Navy (`#1A2238`).
+- **Tab 1 (Dashboard)**: Countdown hari H (10 Okt 2027), bar kemajuan, kartu anggaran & peringatan over-budget, rekap kontribusi Octa vs Jenesia.
+- **Tab 2 (Checklist)**: Filter kategori kanonik/KPP/sipil/liturgi, status tugas todo/done, prioritas, dan penanggung jawab (PIC).
+- **Tab 3 (Anggaran & Vendor)**: Pos anggaran per kategori, direktori vendor dengan status lifecycle, dan transaksi pembayaran dengan label pembayar.
+- **Tab 4 (Tamu & Angpau)**: Segmented switcher antara kalkulator konfirmasi pax katering resepsi vs buku besar angpau tunai/transfer & kado fisik serta status ucapan terima kasih.
+- **Tab 5 (Dokumen Kanonik)**: Indikator kelengkapan dokumen pernikahan, banner aturan kanonik Katolik surat baptis $\le$ 180 hari, dan status verifikasi berkas.
 
 ---
 
-### 3. Menjalankan Seluruh Pengujian Otomatis (Full Test Suite)
+### 4. Menjalankan Seluruh Pengujian Otomatis (Full Test Suite)
 Untuk memverifikasi keandalan seluruh fungsi dan logika matematis proyek:
 ```bash
 npm test
 ```
-Seluruh **14 test suites** (51 tests) akan dijalankan:
+Seluruh **20 test suites** (69 tests) akan dijalankan:
 - `tests/config/supabase.test.ts`
 - `tests/db/schema_validation.test.ts`
 - `tests/db/phase2_schema_validation.test.ts`
@@ -65,8 +76,14 @@ Seluruh **14 test suites** (51 tests) akan dijalankan:
 - `tests/services/guestService.test.ts`
 - `tests/services/giftService.test.ts`
 - `tests/services/documentService.test.ts`
+- `tests/ui/theme.test.ts`
+- `tests/ui/components.test.ts`
+- `tests/ui/navigation.test.ts`
+- `tests/ui/core_screens.test.ts`
+- `tests/ui/data_screens.test.ts`
 - `tests/demo.test.ts`
 - `tests/phase2_demo.test.ts`
+- `tests/phase3_ui_demo.test.ts`
 
 ---
 

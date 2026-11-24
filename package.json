@@ -6,7 +6,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "demo": "jest tests/demo.test.ts",
-    "demo:phase2": "jest tests/phase2_demo.test.ts"
+    "demo:phase2": "jest tests/phase2_demo.test.ts",
+    "demo:ui": "jest tests/phase3_ui_demo.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
