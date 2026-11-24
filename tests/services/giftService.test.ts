@@ -1,4 +1,4 @@
-import { calculateGiftSummary, GiftService } from '../../src/services/giftService';
+import { calculateGiftSummary, GiftService, mapGiftRow } from '../../src/services/giftService';
 import { Gift, GiftType, GiftRecipient } from '../../src/types/gift';
 import { supabase } from '../../src/config/supabase';
 
@@ -7,6 +7,33 @@ jest.mock('../../src/config/supabase', () => ({
     from: jest.fn(),
   },
 }));
+
+describe('mapGiftRow', () => {
+  it('correctly maps snake_case database row to camelCase Gift model', () => {
+    const row = {
+      id: 'gf1',
+      workspace_id: 'w1',
+      guest_id: 'g1',
+      sender_name: 'Om Anton',
+      gift_type: 'cash',
+      amount: '5000000',
+      gift_description: null,
+      received_by: 'groom',
+      received_at: '2027-10-10T12:00:00Z',
+      thank_you_sent: true,
+      notes: 'Amplop merah',
+    };
+
+    const gift = mapGiftRow(row);
+    expect(gift.id).toBe('gf1');
+    expect(gift.workspaceId).toBe('w1');
+    expect(gift.guestId).toBe('g1');
+    expect(gift.senderName).toBe('Om Anton');
+    expect(gift.giftType).toBe('cash');
+    expect(gift.amount).toBe(5000000);
+    expect(gift.thankYouSent).toBe(true);
+  });
+});
 
 describe('calculateGiftSummary', () => {
   it('separates cash and transfer from physical gifts and computes recipient breakdown', () => {
@@ -18,6 +45,7 @@ describe('calculateGiftSummary', () => {
     ];
 
     const summary = calculateGiftSummary(gifts);
+    expect(summary.totalGifts).toBe(4);
     expect(summary.totalCashCollected).toBe(10000000); // 2M + 3M + 5M
     expect(summary.byRecipient.groom).toBe(2000000);
     expect(summary.byRecipient.bride).toBe(3000000);
@@ -25,13 +53,16 @@ describe('calculateGiftSummary', () => {
     expect(summary.byRecipient.both).toBe(0);
     expect(summary.physicalGiftsCount).toBe(1);
     expect(summary.physicalGifts[0].giftDescription).toBe('Coffee Maker');
+    expect(summary.thankYouSentCount).toBe(2);
     expect(summary.thankYouPendingCount).toBe(2);
   });
 
   it('handles empty gifts list gracefully', () => {
     const summary = calculateGiftSummary([]);
+    expect(summary.totalGifts).toBe(0);
     expect(summary.totalCashCollected).toBe(0);
     expect(summary.physicalGiftsCount).toBe(0);
+    expect(summary.thankYouSentCount).toBe(0);
     expect(summary.thankYouPendingCount).toBe(0);
   });
 });
@@ -41,22 +72,30 @@ describe('GiftService Operations', () => {
     jest.clearAllMocks();
   });
 
-  it('fetches gifts by workspace', async () => {
-    const mockGifts = [{ id: '1', sender_name: 'Budi' }];
+  it('fetches gifts by workspace returning mapped domain models', async () => {
+    const mockDbRows = [
+      { id: '1', workspace_id: 'w1', sender_name: 'Budi', gift_type: 'cash', amount: '1000000', thank_you_sent: false },
+    ];
     const selectMock = jest.fn().mockReturnValue({
-      eq: jest.fn().mockResolvedValue({ data: mockGifts, error: null }),
+      eq: jest.fn().mockResolvedValue({ data: mockDbRows, error: null }),
     });
 
     (supabase.from as jest.Mock).mockReturnValue({ select: selectMock });
 
     const result = await GiftService.getGiftsByWorkspace('w1');
     expect(supabase.from).toHaveBeenCalledWith('gifts');
-    expect(result).toEqual(mockGifts);
+    expect(result.length).toBe(1);
+    expect(result[0].senderName).toBe('Budi');
+    expect(result[0].amount).toBe(1000000);
+    expect(result[0].giftType).toBe('cash');
   });
 
-  it('records a new gift', async () => {
+  it('records a new gift and returns mapped domain model', async () => {
     const insertMock = jest.fn().mockReturnValue({
-      select: jest.fn().mockResolvedValue({ data: [{ id: '1', sender_name: 'Budi', amount: 1000000 }], error: null }),
+      select: jest.fn().mockResolvedValue({
+        data: [{ id: '1', workspace_id: 'w1', sender_name: 'Budi', amount: '1000000', gift_type: 'cash' }],
+        error: null,
+      }),
     });
 
     (supabase.from as jest.Mock).mockReturnValue({ insert: insertMock });
@@ -67,13 +106,17 @@ describe('GiftService Operations', () => {
       amount: 1000000,
       receivedBy: 'both',
     });
-    expect(result.sender_name).toBe('Budi');
+    expect(result.senderName).toBe('Budi');
+    expect(result.amount).toBe(1000000);
   });
 
-  it('updates thank you note status', async () => {
+  it('updates thank you note status and returns mapped model', async () => {
     const updateMock = jest.fn().mockReturnValue({
       eq: jest.fn().mockReturnValue({
-        select: jest.fn().mockResolvedValue({ data: [{ id: '1', thank_you_sent: true }], error: null }),
+        select: jest.fn().mockResolvedValue({
+          data: [{ id: '1', workspace_id: 'w1', sender_name: 'Budi', thank_you_sent: true }],
+          error: null,
+        }),
       }),
     });
 
@@ -81,5 +124,6 @@ describe('GiftService Operations', () => {
 
     const result = await GiftService.updateThankYouStatus('1', true);
     expect(result.success).toBe(true);
+    expect(result.data?.thankYouSent).toBe(true);
   });
 });

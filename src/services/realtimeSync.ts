@@ -28,6 +28,9 @@ export function subscribeToWorkspaceChanges(
     'checklist_categories',
     'budget_categories',
     'budgets',
+    'guests',
+    'gifts',
+    'wedding_documents',
   ];
 
   childTables.forEach((table) => {

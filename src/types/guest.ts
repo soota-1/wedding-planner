@@ -25,4 +25,5 @@ export interface GuestMetrics {
   declinedPax: number;
   tentativePax: number;
   attendanceRate: number;
+  invitationsSentCount: number;
 }

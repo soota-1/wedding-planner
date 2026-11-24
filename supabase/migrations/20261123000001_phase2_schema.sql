@@ -5,14 +5,14 @@
 -- 1. Guests Table
 CREATE TABLE guests (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     phone VARCHAR(50),
     email VARCHAR(100),
     side VARCHAR(20) NOT NULL CHECK (side IN ('groom', 'bride', 'both')),
     group_tag VARCHAR(100) DEFAULT 'General',
-    estimated_pax INT NOT NULL DEFAULT 1,
-    actual_pax INT NOT NULL DEFAULT 0,
+    estimated_pax INT NOT NULL DEFAULT 1 CHECK (estimated_pax >= 1),
+    actual_pax INT NOT NULL DEFAULT 0 CHECK (actual_pax >= 0),
     rsvp_status VARCHAR(20) DEFAULT 'pending' CHECK (rsvp_status IN ('pending', 'attending', 'declined', 'tentative')),
     invitation_sent BOOLEAN DEFAULT false,
     notes TEXT,
@@ -22,11 +22,11 @@ CREATE TABLE guests (
 -- 2. Gifts Table (Angpau & Kado Fisik)
 CREATE TABLE gifts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
     guest_id UUID REFERENCES guests(id) ON DELETE SET NULL,
     sender_name VARCHAR(255) NOT NULL,
     gift_type VARCHAR(20) NOT NULL CHECK (gift_type IN ('cash', 'transfer', 'physical_gift')),
-    amount NUMERIC DEFAULT 0,
+    amount NUMERIC DEFAULT 0 CHECK (amount >= 0),
     gift_description TEXT,
     received_by VARCHAR(20) NOT NULL CHECK (received_by IN ('groom', 'bride', 'both', 'family_groom', 'family_bride')),
     received_at TIMESTAMPTZ DEFAULT now(),
@@ -37,7 +37,7 @@ CREATE TABLE gifts (
 -- 3. Wedding Documents Table (Berkas Kanonik & Sipil)
 CREATE TABLE wedding_documents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
     document_type VARCHAR(50) DEFAULT 'other' CHECK (document_type IN ('baptism_certificate', 'kpp_certificate', 'civil_n1_n4', 'other')),
     category VARCHAR(50) NOT NULL CHECK (category IN ('church_canonical', 'civil_disdukcapil', 'vendor_contract', 'other')),
@@ -50,6 +50,12 @@ CREATE TABLE wedding_documents (
     notes TEXT,
     created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Indexes for Foreign Keys & Workspace Performance
+CREATE INDEX idx_guests_workspace_id ON guests(workspace_id);
+CREATE INDEX idx_gifts_workspace_id ON gifts(workspace_id);
+CREATE INDEX idx_gifts_guest_id ON gifts(guest_id);
+CREATE INDEX idx_wedding_documents_workspace_id ON wedding_documents(workspace_id);
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE guests ENABLE ROW LEVEL SECURITY;

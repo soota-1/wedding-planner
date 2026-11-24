@@ -1,17 +1,40 @@
 import { supabase } from '../config/supabase';
 import { Guest, GuestMetrics, GuestSide, RsvpStatus } from '../types/guest';
 
-export function calculateGuestMetrics(guests: Guest[]): GuestMetrics {
+export function mapGuestRow(row: any): Guest {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    name: row.name,
+    phone: row.phone ?? null,
+    email: row.email ?? null,
+    side: row.side,
+    groupTag: row.group_tag,
+    estimatedPax: Number(row.estimated_pax) || 0,
+    actualPax: Number(row.actual_pax) || 0,
+    rsvpStatus: row.rsvp_status,
+    invitationSent: Boolean(row.invitation_sent),
+    notes: row.notes ?? null,
+    createdAt: row.created_at,
+  };
+}
+
+export function calculateGuestMetrics(guests: Guest[] = []): GuestMetrics {
   const totalGuests = guests.length;
   let totalInvitedPax = 0;
   let confirmedAttendingPax = 0;
   let declinedPax = 0;
   let tentativePax = 0;
+  let invitationsSentCount = 0;
 
   guests.forEach((g) => {
     const est = Number(g.estimatedPax) || 0;
     const act = Number(g.actualPax) || 0;
     totalInvitedPax += est;
+
+    if (g.invitationSent) {
+      invitationsSentCount++;
+    }
 
     if (g.rsvpStatus === 'attending') {
       confirmedAttendingPax += act > 0 ? act : est;
@@ -33,11 +56,12 @@ export function calculateGuestMetrics(guests: Guest[]): GuestMetrics {
     declinedPax,
     tentativePax,
     attendanceRate,
+    invitationsSentCount,
   };
 }
 
 export class GuestService {
-  static async getGuestsByWorkspace(workspaceId: string, filterSide?: GuestSide) {
+  static async getGuestsByWorkspace(workspaceId: string, filterSide?: GuestSide): Promise<Guest[]> {
     let query = supabase.from('guests').select('*').eq('workspace_id', workspaceId);
 
     if (filterSide) {
@@ -46,10 +70,10 @@ export class GuestService {
 
     const { data, error } = await query;
     if (error) throw error;
-    return data;
+    return (data || []).map(mapGuestRow);
   }
 
-  static async addGuest(workspaceId: string, guest: Partial<Guest>) {
+  static async addGuest(workspaceId: string, guest: Partial<Guest>): Promise<Guest> {
     const { data, error } = await supabase
       .from('guests')
       .insert({
@@ -68,7 +92,7 @@ export class GuestService {
       .select();
 
     if (error) throw error;
-    return data?.[0];
+    return mapGuestRow(data?.[0]);
   }
 
   static async updateRsvpStatus(guestId: string, status: RsvpStatus, actualPax?: number) {
@@ -87,6 +111,6 @@ export class GuestService {
       .select();
 
     if (error) throw error;
-    return { success: true, data: data?.[0] };
+    return { success: true, data: data?.[0] ? mapGuestRow(data[0]) : null };
   }
 }

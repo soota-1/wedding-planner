@@ -1,7 +1,23 @@
 import { supabase } from '../config/supabase';
 import { Gift, GiftSummary, GiftRecipient } from '../types/gift';
 
-export function calculateGiftSummary(gifts: Gift[]): GiftSummary {
+export function mapGiftRow(row: any): Gift {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    guestId: row.guest_id ?? null,
+    senderName: row.sender_name,
+    giftType: row.gift_type,
+    amount: Number(row.amount) || 0,
+    giftDescription: row.gift_description ?? null,
+    receivedBy: row.received_by,
+    receivedAt: row.received_at,
+    thankYouSent: Boolean(row.thank_you_sent),
+    notes: row.notes ?? null,
+  };
+}
+
+export function calculateGiftSummary(gifts: Gift[] = []): GiftSummary {
   let totalCashCollected = 0;
   const byRecipient: Record<GiftRecipient, number> = {
     groom: 0,
@@ -13,6 +29,7 @@ export function calculateGiftSummary(gifts: Gift[]): GiftSummary {
 
   const physicalGifts: Gift[] = [];
   let thankYouPendingCount = 0;
+  let thankYouSentCount = 0;
 
   gifts.forEach((g) => {
     const amount = Number(g.amount) || 0;
@@ -26,32 +43,36 @@ export function calculateGiftSummary(gifts: Gift[]): GiftSummary {
       physicalGifts.push(g);
     }
 
-    if (!g.thankYouSent) {
+    if (g.thankYouSent) {
+      thankYouSentCount++;
+    } else {
       thankYouPendingCount++;
     }
   });
 
   return {
+    totalGifts: gifts.length,
     totalCashCollected,
     byRecipient,
     physicalGiftsCount: physicalGifts.length,
     physicalGifts,
+    thankYouSentCount,
     thankYouPendingCount,
   };
 }
 
 export class GiftService {
-  static async getGiftsByWorkspace(workspaceId: string) {
+  static async getGiftsByWorkspace(workspaceId: string): Promise<Gift[]> {
     const { data, error } = await supabase
       .from('gifts')
       .select('*')
       .eq('workspace_id', workspaceId);
 
     if (error) throw error;
-    return data;
+    return (data || []).map(mapGiftRow);
   }
 
-  static async recordGift(workspaceId: string, gift: Partial<Gift>) {
+  static async recordGift(workspaceId: string, gift: Partial<Gift>): Promise<Gift> {
     const { data, error } = await supabase
       .from('gifts')
       .insert({
@@ -68,7 +89,7 @@ export class GiftService {
       .select();
 
     if (error) throw error;
-    return data?.[0];
+    return mapGiftRow(data?.[0]);
   }
 
   static async updateThankYouStatus(giftId: string, sent: boolean) {
@@ -79,6 +100,6 @@ export class GiftService {
       .select();
 
     if (error) throw error;
-    return { success: true, data: data?.[0] };
+    return { success: true, data: data?.[0] ? mapGiftRow(data[0]) : null };
   }
 }

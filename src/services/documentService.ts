@@ -1,6 +1,24 @@
-import { differenceInCalendarDays } from 'date-fns';
+import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { supabase } from '../config/supabase';
 import { WeddingDocument, ComplianceSummary, DocumentStatus } from '../types/document';
+
+export function mapDocumentRow(row: any): WeddingDocument {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    title: row.title,
+    documentType: row.document_type,
+    category: row.category,
+    owner: row.owner,
+    fileUrl: row.file_url ?? null,
+    fileType: row.file_type ?? null,
+    status: row.status,
+    issueDate: row.issue_date ?? null,
+    expiryDate: row.expiry_date ?? null,
+    notes: row.notes ?? null,
+    createdAt: row.created_at,
+  };
+}
 
 export function isBaptismCertificateValid(issueDate: Date, weddingDate: Date): boolean {
   const diffDays = differenceInCalendarDays(weddingDate, issueDate);
@@ -9,7 +27,7 @@ export function isBaptismCertificateValid(issueDate: Date, weddingDate: Date): b
 }
 
 export function calculateDocumentCompliance(
-  documents: WeddingDocument[],
+  documents: WeddingDocument[] = [],
   weddingDate: Date
 ): ComplianceSummary {
   const totalDocuments = documents.length;
@@ -21,9 +39,10 @@ export function calculateDocumentCompliance(
   documents.forEach((doc) => {
     let effectiveStatus: DocumentStatus = doc.status;
 
-    // Evaluasi otomatis masa berlaku surat baptis jika tanggal terbit ada
-    if (doc.documentType === 'baptism_certificate' && doc.issueDate) {
-      const isValid = isBaptismCertificateValid(new Date(doc.issueDate), weddingDate);
+    // Evaluasi otomatis masa berlaku surat baptis jika tanggal terbit ada dan belum di-reject secara eksplisit
+    if (doc.documentType === 'baptism_certificate' && doc.issueDate && doc.status !== 'rejected') {
+      const issueDateParsed = typeof doc.issueDate === 'string' ? parseISO(doc.issueDate) : doc.issueDate;
+      const isValid = isBaptismCertificateValid(issueDateParsed, weddingDate);
       if (!isValid) {
         effectiveStatus = 'expired';
       }
@@ -54,17 +73,17 @@ export function calculateDocumentCompliance(
 }
 
 export class DocumentService {
-  static async getDocumentsByWorkspace(workspaceId: string) {
+  static async getDocumentsByWorkspace(workspaceId: string): Promise<WeddingDocument[]> {
     const { data, error } = await supabase
       .from('wedding_documents')
       .select('*')
       .eq('workspace_id', workspaceId);
 
     if (error) throw error;
-    return data;
+    return (data || []).map(mapDocumentRow);
   }
 
-  static async registerDocument(workspaceId: string, doc: Partial<WeddingDocument>) {
+  static async registerDocument(workspaceId: string, doc: Partial<WeddingDocument>): Promise<WeddingDocument> {
     const { data, error } = await supabase
       .from('wedding_documents')
       .insert({
@@ -83,7 +102,7 @@ export class DocumentService {
       .select();
 
     if (error) throw error;
-    return data?.[0];
+    return mapDocumentRow(data?.[0]);
   }
 
   static async verifyDocument(documentId: string, status: DocumentStatus) {
@@ -94,6 +113,6 @@ export class DocumentService {
       .select();
 
     if (error) throw error;
-    return { success: true, data: data?.[0] };
+    return { success: true, data: data?.[0] ? mapDocumentRow(data[0]) : null };
   }
 }

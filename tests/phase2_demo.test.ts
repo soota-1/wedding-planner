@@ -29,6 +29,7 @@ describe('Interactive Feature Demonstration - Phase 2 Data Modules', () => {
 
     const guestMetrics = calculateGuestMetrics(guestList);
     console.log(`  - Total Tamu Terdaftar     : ${guestMetrics.totalGuests} entri`);
+    console.log(`  - Undangan Terkirim        : ${guestMetrics.invitationsSentCount} undangan`);
     console.log(`  - Total Estimasi Kuota Pax : ${guestMetrics.totalInvitedPax} pax`);
     console.log(`  - Realisasi Pax Hadir      : ${guestMetrics.confirmedAttendingPax} pax (Fix untuk Vendor Katering)`);
     console.log(`  - Pax Menolak (Declined)   : ${guestMetrics.declinedPax} pax`);
@@ -53,8 +54,10 @@ describe('Interactive Feature Demonstration - Phase 2 Data Modules', () => {
     ];
 
     const giftSummary = calculateGiftSummary(gifts);
+    console.log(`  - Total Hadiah / Angpau    : ${giftSummary.totalGifts} pemberian`);
     console.log(`  - Total Angpau Terkumpul   : Rp ${giftSummary.totalCashCollected.toLocaleString('id-ID')}`);
     console.log(`  - Jumlah Kado Fisik        : ${giftSummary.physicalGiftsCount} barang`);
+    console.log(`  - Ucapan TQ Sudah Terkirim : ${giftSummary.thankYouSentCount} pengirim`);
     console.log(`  - Belum Kirim Ucapan TQ    : ${giftSummary.thankYouPendingCount} pengirim`);
     console.log('  Pemberian Berdasarkan Penerima:');
     console.log(`    • Khusus Groom (Octa)    : Rp ${giftSummary.byRecipient.groom.toLocaleString('id-ID')}`);
@@ -66,8 +69,10 @@ describe('Interactive Feature Demonstration - Phase 2 Data Modules', () => {
       console.log(`    📦 Dari: ${g.senderName} -> "${g.giftDescription}" [Penerima: ${g.receivedBy}]`);
     });
 
+    expect(giftSummary.totalGifts).toBe(5);
     expect(giftSummary.totalCashCollected).toBe(23500000);
     expect(giftSummary.physicalGiftsCount).toBe(1);
+    expect(giftSummary.thankYouSentCount).toBe(3);
     expect(giftSummary.thankYouPendingCount).toBe(2);
 
     // -------------------------------------------------------------

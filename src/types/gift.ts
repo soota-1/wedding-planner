@@ -17,9 +17,11 @@ export interface Gift {
 }
 
 export interface GiftSummary {
+  totalGifts: number;
   totalCashCollected: number;
   byRecipient: Record<GiftRecipient, number>;
   physicalGiftsCount: number;
   physicalGifts: Gift[];
+  thankYouSentCount: number;
   thankYouPendingCount: number;
 }
