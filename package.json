@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "scripts": {
+    "start": "expo start",
     "test": "jest",
     "test:watch": "jest --watch",
     "demo": "jest tests/demo.test.ts",
