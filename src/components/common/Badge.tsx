@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import { View, Text, StyleSheet, StyleProp, ViewStyle, TextStyle } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 
@@ -9,7 +9,7 @@ export interface BadgeProps {
   label: string;
   variant?: BadgeVariant;
   size?: 'sm' | 'md';
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 }
 
 export function Badge({ label, variant = 'neutral', size = 'sm', style }: BadgeProps) {

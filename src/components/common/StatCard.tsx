@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ViewStyle, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, StyleProp, ViewStyle, TouchableOpacity } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 
@@ -9,7 +9,7 @@ export interface StatCardProps {
   subtext?: string;
   accentColor?: string;
   variant?: 'default' | 'highlight' | 'warning' | 'success';
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   onPress?: () => void;
 }
 

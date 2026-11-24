@@ -1,22 +1,42 @@
 process.env.EXPO_PUBLIC_SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://mock-project.supabase.co';
 process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'mock-anon-key-123456';
 
+const reactModule = require('react');
+
+// Minimal React Hooks dispatcher for headless component testing
+const defaultDispatcher = {
+  useState: (initial: any) => [typeof initial === 'function' ? initial() : initial, jest.fn()],
+  useEffect: jest.fn(),
+  useCallback: (fn: any) => fn,
+  useMemo: (fn: any) => fn(),
+  useRef: (initial: any) => ({ current: initial }),
+  useContext: (ctx: any) => ctx?._currentValue || {},
+  useId: () => 'mock-id',
+};
+
+const ReactSharedInternals =
+  (reactModule as any).__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED ||
+  (reactModule as any).__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
+
+if (ReactSharedInternals) {
+  ReactSharedInternals.ReactCurrentDispatcher = { current: defaultDispatcher };
+}
+
 // React Native Mocks for Jest Node Environment
 jest.mock('react-native', () => {
-  const React = require('react');
   return {
     View: ({ children, style, ...props }: any) =>
-      React.createElement('View', { style, ...props }, children),
+      reactModule.createElement('View', { style, ...props }, children),
     Text: ({ children, style, ...props }: any) =>
-      React.createElement('Text', { style, ...props }, children),
+      reactModule.createElement('Text', { style, ...props }, children),
     TouchableOpacity: ({ children, onPress, style, ...props }: any) =>
-      React.createElement('TouchableOpacity', { onPress, style, ...props }, children),
+      reactModule.createElement('TouchableOpacity', { onPress, style, ...props }, children),
     ScrollView: ({ children, style, ...props }: any) =>
-      React.createElement('ScrollView', { style, ...props }, children),
+      reactModule.createElement('ScrollView', { style, ...props }, children),
     TextInput: ({ value, onChangeText, style, ...props }: any) =>
-      React.createElement('TextInput', { value, onChangeText, style, ...props }),
+      reactModule.createElement('TextInput', { value, onChangeText, style, ...props }),
     Modal: ({ children, visible, ...props }: any) =>
-      visible ? React.createElement('Modal', props, children) : null,
+      visible ? reactModule.createElement('Modal', props, children) : null,
     StyleSheet: {
       create: (styles: any) => styles,
       flatten: (styles: any) =>
