@@ -74,6 +74,13 @@ export default function GuestsScreen() {
   const thankYouPendingCount = initialGifts.filter((g) => !g.thankYouSent).length;
   const thankYouSentCount = initialGifts.filter((g) => g.thankYouSent).length;
 
+  const recipientTotals = initialGifts.reduce((acc, g) => {
+    if (g.giftType === 'cash' || g.giftType === 'transfer') {
+      acc[g.receivedBy] = (acc[g.receivedBy] || 0) + g.amount;
+    }
+    return acc;
+  }, {} as Record<string, number>);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Header
@@ -230,19 +237,27 @@ export default function GuestsScreen() {
             <Text style={styles.sectionTitle}>Pemberian Berdasarkan Penerima</Text>
             <View style={styles.recipientRow}>
               <Text style={styles.recipientText}>🤵 Khusus Groom (Octa):</Text>
-              <Text style={styles.recipientValue}>Rp 5.000.000</Text>
+              <Text style={styles.recipientValue}>
+                Rp {(recipientTotals['groom'] || 0).toLocaleString('id-ID')}
+              </Text>
             </View>
             <View style={styles.recipientRow}>
               <Text style={styles.recipientText}>👰 Khusus Bride (Jenesia):</Text>
-              <Text style={styles.recipientValue}>Rp 7.500.000</Text>
+              <Text style={styles.recipientValue}>
+                Rp {(recipientTotals['bride'] || 0).toLocaleString('id-ID')}
+              </Text>
             </View>
             <View style={styles.recipientRow}>
               <Text style={styles.recipientText}>👨‍👩‍👧 Keluarga Groom:</Text>
-              <Text style={styles.recipientValue}>Rp 1.000.000</Text>
+              <Text style={styles.recipientValue}>
+                Rp {(recipientTotals['family_groom'] || 0).toLocaleString('id-ID')}
+              </Text>
             </View>
             <View style={[styles.recipientRow, styles.recipientRowTotal]}>
               <Text style={[styles.recipientText, styles.boldText]}>👫 Kedua Mempelai (Bersama):</Text>
-              <Text style={[styles.recipientValue, styles.boldText]}>Rp 10.000.000</Text>
+              <Text style={[styles.recipientValue, styles.boldText]}>
+                Rp {(recipientTotals['both'] || 0).toLocaleString('id-ID')}
+              </Text>
             </View>
           </Card>
 

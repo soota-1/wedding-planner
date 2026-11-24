@@ -93,13 +93,12 @@ export default function ChecklistScreen() {
             onPress={() => toggleTask(t.id)}
           >
             <View style={styles.cardHeaderRow}>
-              {/* Checkbox */}
-              <TouchableOpacity
-                onPress={() => toggleTask(t.id)}
+              {/* Checkbox Indicator */}
+              <View
                 style={[styles.checkbox, t.completed && styles.checkboxChecked]}
               >
                 {t.completed ? <Text style={styles.checkIcon}>✓</Text> : null}
-              </TouchableOpacity>
+              </View>
 
               <View style={styles.taskTextContainer}>
                 <Text

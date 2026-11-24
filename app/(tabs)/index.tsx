@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { differenceInCalendarDays } from 'date-fns';
 import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 import { Card } from '../../src/components/common/Card';
@@ -10,9 +11,7 @@ import { Badge } from '../../src/components/common/Badge';
 
 export default function DashboardScreen() {
   const weddingDate = new Date('2027-10-10T00:00:00.000Z');
-  const today = new Date();
-  const diffTime = weddingDate.getTime() - today.getTime();
-  const daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+  const daysRemaining = Math.max(0, differenceInCalendarDays(weddingDate, new Date()));
 
   // Mock initial dashboard state representing active workspace
   const workspaceName = 'Pernikahan Octa & Jenesia';

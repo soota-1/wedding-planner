@@ -50,7 +50,7 @@ export function StatCard({
 
   if (onPress) {
     return (
-      <TouchableOpacity activeOpacity={0.7} onPress={onPress}>
+      <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={[{ flex: 1 }, style]}>
         {content}
       </TouchableOpacity>
     );
