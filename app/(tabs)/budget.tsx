@@ -1,6 +1,19 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  LayoutAnimation,
+  UIManager,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 import { Card } from '../../src/components/common/Card';
@@ -10,6 +23,10 @@ import { Badge } from '../../src/components/common/Badge';
 import { ProgressBar } from '../../src/components/common/ProgressBar';
 import { SegmentedControl } from '../../src/components/common/SegmentedControl';
 import { FadeInView } from '../../src/components/common/FadeInView';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface CategoryItem {
   id: string;
@@ -37,21 +54,21 @@ interface TransactionItem {
   notes: string;
 }
 
-const categories: CategoryItem[] = [
+const initialCategories: CategoryItem[] = [
   { id: '1', name: 'Venue & Gedung Resepsi', allocated: 50000000, committed: 50000000 },
   { id: '2', name: 'Katering Mawar (800 Porsi)', allocated: 70000000, committed: 80000000 },
   { id: '3', name: 'Dokumentasi Foto & Video', allocated: 20000000, committed: 28000000 },
   { id: '4', name: 'Busana Pengantin & MUA', allocated: 10000000, committed: 0 },
 ];
 
-const vendors: VendorItem[] = [
+const initialVendors: VendorItem[] = [
   { id: 'v1', name: 'Gedung Paroki St. Perawan Maria', category: 'Venue', contractValue: 50000000, status: 'booked', contactPerson: 'Ibu Marta' },
   { id: 'v2', name: 'Katering Selera Nusantara', category: 'Katering', contractValue: 80000000, status: 'booked', contactPerson: 'Pak Hendra' },
   { id: 'v3', name: 'Atelier Wedding Photography', category: 'Dokumentasi', contractValue: 28000000, status: 'booked', contactPerson: 'David' },
   { id: 'v4', name: 'Sanggar Rias & Gaun Pengantin', category: 'Busana', contractValue: 15000000, status: 'shortlisted', contactPerson: 'Cindy' },
 ];
 
-const transactions: TransactionItem[] = [
+const initialTransactions: TransactionItem[] = [
   { id: 'tx1', vendorName: 'Gedung Paroki St. Perawan Maria', amount: 10000000, paidBy: 'groom', status: 'paid', date: '10 Feb 2027', notes: 'Booking Fee Gedung' },
   { id: 'tx2', vendorName: 'Katering Selera Nusantara', amount: 20000000, paidBy: 'bride', status: 'paid', date: '01 Mar 2027', notes: 'DP 25% Prasmanan' },
   { id: 'tx3', vendorName: 'Atelier Wedding Photography', amount: 5000000, paidBy: 'family', status: 'paid', date: '15 Mar 2027', notes: 'DP Liputan Misa' },
@@ -61,11 +78,208 @@ const transactions: TransactionItem[] = [
 export default function BudgetScreen() {
   const [activeTab, setActiveTab] = useState(0);
 
-  const targetBudget = 150000000;
-  const cashSpent = 35000000;
-  const totalCommitted = 158000000;
+  // Entities state
+  const [categories, setCategories] = useState<CategoryItem[]>(initialCategories);
+  const [vendors, setVendors] = useState<VendorItem[]>(initialVendors);
+  const [transactions, setTransactions] = useState<TransactionItem[]>(initialTransactions);
+
+  // Modals state
+  const [modalType, setModalType] = useState<'category' | 'vendor' | 'transaction' | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Category form state
+  const [catName, setCatName] = useState('');
+  const [catAllocated, setCatAllocated] = useState('');
+  const [catCommitted, setCatCommitted] = useState('');
+
+  // Vendor form state
+  const [vendorName, setVendorName] = useState('');
+  const [vendorCategory, setVendorCategory] = useState('');
+  const [vendorContract, setVendorContract] = useState('');
+  const [vendorStatus, setVendorStatus] = useState<VendorItem['status']>('booked');
+  const [vendorContact, setVendorContact] = useState('');
+
+  // Transaction form state
+  const [txNotes, setTxNotes] = useState('');
+  const [txVendor, setTxVendor] = useState('');
+  const [txAmount, setTxAmount] = useState('');
+  const [txPaidBy, setTxPaidBy] = useState<TransactionItem['paidBy']>('groom');
+  const [txStatus, setTxStatus] = useState<TransactionItem['status']>('paid');
+  const [txDate, setTxDate] = useState('');
+
+  // Open Add Modals
+  const handleOpenAdd = () => {
+    setEditingId(null);
+    if (activeTab === 0) {
+      setCatName('');
+      setCatAllocated('');
+      setCatCommitted('');
+      setModalType('category');
+    } else if (activeTab === 1) {
+      setVendorName('');
+      setVendorCategory('');
+      setVendorContract('');
+      setVendorStatus('booked');
+      setVendorContact('');
+      setModalType('vendor');
+    } else {
+      setTxNotes('');
+      setTxVendor('');
+      setTxAmount('');
+      setTxPaidBy('groom');
+      setTxStatus('paid');
+      setTxDate('Hari ini');
+      setModalType('transaction');
+    }
+  };
+
+  // Open Edit Modals
+  const openEditCategory = (item: CategoryItem) => {
+    setEditingId(item.id);
+    setCatName(item.name);
+    setCatAllocated(item.allocated.toString());
+    setCatCommitted(item.committed.toString());
+    setModalType('category');
+  };
+
+  const openEditVendor = (item: VendorItem) => {
+    setEditingId(item.id);
+    setVendorName(item.name);
+    setVendorCategory(item.category);
+    setVendorContract(item.contractValue.toString());
+    setVendorStatus(item.status);
+    setVendorContact(item.contactPerson);
+    setModalType('vendor');
+  };
+
+  const openEditTx = (item: TransactionItem) => {
+    setEditingId(item.id);
+    setTxNotes(item.notes);
+    setTxVendor(item.vendorName);
+    setTxAmount(item.amount.toString());
+    setTxPaidBy(item.paidBy);
+    setTxStatus(item.status);
+    setTxDate(item.date);
+    setModalType('transaction');
+  };
+
+  // Save Handlers
+  const handleSaveCategory = () => {
+    if (!catName.trim()) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const alloc = parseInt(catAllocated.replace(/[^0-9]/g, ''), 10) || 0;
+    const comm = parseInt(catCommitted.replace(/[^0-9]/g, ''), 10) || 0;
+
+    if (editingId) {
+      setCategories((prev) =>
+        prev.map((c) =>
+          c.id === editingId ? { ...c, name: catName.trim(), allocated: alloc, committed: comm } : c
+        )
+      );
+    } else {
+      const newCat: CategoryItem = {
+        id: Date.now().toString(),
+        name: catName.trim(),
+        allocated: alloc,
+        committed: comm,
+      };
+      setCategories((prev) => [...prev, newCat]);
+    }
+    setModalType(null);
+  };
+
+  const handleSaveVendor = () => {
+    if (!vendorName.trim()) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const contract = parseInt(vendorContract.replace(/[^0-9]/g, ''), 10) || 0;
+
+    if (editingId) {
+      setVendors((prev) =>
+        prev.map((v) =>
+          v.id === editingId
+            ? {
+                ...v,
+                name: vendorName.trim(),
+                category: vendorCategory.trim() || 'Lainnya',
+                contractValue: contract,
+                status: vendorStatus,
+                contactPerson: vendorContact.trim() || 'PIC',
+              }
+            : v
+        )
+      );
+    } else {
+      const newVendor: VendorItem = {
+        id: Date.now().toString(),
+        name: vendorName.trim(),
+        category: vendorCategory.trim() || 'Lainnya',
+        contractValue: contract,
+        status: vendorStatus,
+        contactPerson: vendorContact.trim() || 'PIC',
+      };
+      setVendors((prev) => [...prev, newVendor]);
+    }
+    setModalType(null);
+  };
+
+  const handleSaveTx = () => {
+    if (!txNotes.trim()) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const amount = parseInt(txAmount.replace(/[^0-9]/g, ''), 10) || 0;
+
+    if (editingId) {
+      setTransactions((prev) =>
+        prev.map((tx) =>
+          tx.id === editingId
+            ? {
+                ...tx,
+                notes: txNotes.trim(),
+                vendorName: txVendor.trim() || 'Vendor',
+                amount,
+                paidBy: txPaidBy,
+                status: txStatus,
+                date: txDate.trim() || 'Hari ini',
+              }
+            : tx
+        )
+      );
+    } else {
+      const newTx: TransactionItem = {
+        id: Date.now().toString(),
+        notes: txNotes.trim(),
+        vendorName: txVendor.trim() || 'Vendor',
+        amount,
+        paidBy: txPaidBy,
+        status: txStatus,
+        date: txDate.trim() || 'Hari ini',
+      };
+      setTransactions((prev) => [newTx, ...prev]);
+    }
+    setModalType(null);
+  };
+
+  // Delete Handlers
+  const handleDelete = () => {
+    if (!editingId) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (modalType === 'category') {
+      setCategories((prev) => prev.filter((c) => c.id !== editingId));
+    } else if (modalType === 'vendor') {
+      setVendors((prev) => prev.filter((v) => v.id !== editingId));
+    } else if (modalType === 'transaction') {
+      setTransactions((prev) => prev.filter((tx) => tx.id !== editingId));
+    }
+    setModalType(null);
+  };
+
+  // Computed Financials
+  const targetBudget = categories.reduce((acc, c) => acc + c.allocated, 0) || 150000000;
+  const cashSpent = transactions
+    .filter((tx) => tx.status === 'paid')
+    .reduce((acc, tx) => acc + tx.amount, 0);
+  const totalCommitted = categories.reduce((acc, c) => acc + c.committed, 0) || 158000000;
   const remainingCash = targetBudget - cashSpent;
-  const remainingLiability = totalCommitted - cashSpent;
+  const remainingLiability = Math.max(0, totalCommitted - cashSpent);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -78,6 +292,14 @@ export default function BudgetScreen() {
           kicker="Finansial Pasangan"
           title="Anggaran & Vendor"
           subtitle={`Sisa liabilitas kontrak Rp ${(remainingLiability / 1000000).toFixed(0)} Jt`}
+          rightElement={
+            <TouchableOpacity onPress={handleOpenAdd} activeOpacity={0.8} style={styles.addButton}>
+              <Ionicons name="add" size={18} color={colors.textLight} />
+              <Text style={styles.addButtonText}>
+                {activeTab === 0 ? 'Pos Biaya' : activeTab === 1 ? 'Vendor' : 'Transaksi'}
+              </Text>
+            </TouchableOpacity>
+          }
         />
 
         {/* 2x2 Minimalist Stat Grid */}
@@ -102,6 +324,12 @@ export default function BudgetScreen() {
           style={styles.segmented}
         />
 
+        {/* Helper Hint */}
+        <View style={styles.hintContainer}>
+          <Ionicons name="information-circle-outline" size={13} color={colors.textMuted} />
+          <Text style={styles.hintText}>Tekan lama baris untuk Edit atau Hapus</Text>
+        </View>
+
         {activeTab === 0 ? (
           <FadeInView delay={20}>
             <Card style={styles.listCard}>
@@ -109,8 +337,11 @@ export default function BudgetScreen() {
                 const isOver = c.committed > c.allocated;
                 const ratio = c.allocated > 0 ? Math.round((c.committed / c.allocated) * 100) : 0;
                 return (
-                  <View
+                  <TouchableOpacity
                     key={c.id}
+                    activeOpacity={0.7}
+                    onLongPress={() => openEditCategory(c)}
+                    delayLongPress={300}
                     style={[styles.itemBlock, idx === categories.length - 1 && styles.itemLast]}
                   >
                     <View style={styles.rowBetween}>
@@ -136,7 +367,7 @@ export default function BudgetScreen() {
                         Alokasi: Rp {(c.allocated / 1000000).toFixed(0)} Jt
                       </Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </Card>
@@ -145,8 +376,11 @@ export default function BudgetScreen() {
           <FadeInView delay={20}>
             <Card style={styles.listCard}>
               {vendors.map((v, idx) => (
-                <View
+                <TouchableOpacity
                   key={v.id}
+                  activeOpacity={0.7}
+                  onLongPress={() => openEditVendor(v)}
+                  delayLongPress={300}
                   style={[styles.itemBlock, idx === vendors.length - 1 && styles.itemLast]}
                 >
                   <View style={styles.rowBetween}>
@@ -159,14 +393,14 @@ export default function BudgetScreen() {
                       </Text>
                     </View>
                     <Badge
-                      label={v.status === 'booked' ? 'Booked' : 'Shortlist'}
-                      variant={v.status === 'booked' ? 'success' : 'neutral'}
+                      label={v.status === 'booked' ? 'Booked' : v.status === 'completed' ? 'Selesai' : 'Shortlist'}
+                      variant={v.status === 'booked' ? 'success' : v.status === 'completed' ? 'neutral' : 'warning'}
                     />
                   </View>
                   <Text style={styles.contractAmount}>
                     Rp {v.contractValue.toLocaleString('id-ID')}
                   </Text>
-                </View>
+                </TouchableOpacity>
               ))}
             </Card>
           </FadeInView>
@@ -174,8 +408,11 @@ export default function BudgetScreen() {
           <FadeInView delay={20}>
             <Card style={styles.listCard}>
               {transactions.map((tx, idx) => (
-                <View
+                <TouchableOpacity
                   key={tx.id}
+                  activeOpacity={0.7}
+                  onLongPress={() => openEditTx(tx)}
+                  delayLongPress={300}
                   style={[styles.itemBlock, idx === transactions.length - 1 && styles.itemLast]}
                 >
                   <View style={styles.rowBetween}>
@@ -207,12 +444,150 @@ export default function BudgetScreen() {
                       variant={tx.status === 'paid' ? 'success' : 'neutral'}
                     />
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </Card>
           </FadeInView>
         )}
       </ScrollView>
+
+      {/* Category Modal */}
+      <Modal visible={modalType === 'category'} transparent animationType="slide" onRequestClose={() => setModalType(null)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setModalType(null)} />
+          <View style={styles.modalSheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.modalHeading}>{editingId ? 'Edit Pos Anggaran' : 'Tambah Pos Anggaran'}</Text>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={styles.fieldLabel}>Nama Pos Biaya *</Text>
+              <TextInput style={styles.textInput} placeholder="Misal: Dekorasi & Bunga Altar" placeholderTextColor={colors.textMuted} value={catName} onChangeText={setCatName} />
+
+              <Text style={styles.fieldLabel}>Target Alokasi (Rp)</Text>
+              <TextInput style={styles.textInput} keyboardType="numeric" placeholder="Misal: 25000000" placeholderTextColor={colors.textMuted} value={catAllocated} onChangeText={setCatAllocated} />
+
+              <Text style={styles.fieldLabel}>Realisasi Komitmen (Rp)</Text>
+              <TextInput style={styles.textInput} keyboardType="numeric" placeholder="Misal: 28000000" placeholderTextColor={colors.textMuted} value={catCommitted} onChangeText={setCatCommitted} />
+
+              <View style={styles.modalActionRow}>
+                {editingId ? (
+                  <TouchableOpacity onPress={handleDelete} style={styles.deleteButton} activeOpacity={0.8}>
+                    <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                    <Text style={styles.deleteButtonText}>Hapus</Text>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity onPress={handleSaveCategory} style={[styles.saveButton, !catName.trim() && styles.saveButtonDisabled]} activeOpacity={0.8} disabled={!catName.trim()}>
+                  <Text style={styles.saveButtonText}>Simpan Pos</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Vendor Modal */}
+      <Modal visible={modalType === 'vendor'} transparent animationType="slide" onRequestClose={() => setModalType(null)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setModalType(null)} />
+          <View style={styles.modalSheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.modalHeading}>{editingId ? 'Edit Data Vendor' : 'Tambah Vendor Baru'}</Text>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={styles.fieldLabel}>Nama Vendor *</Text>
+              <TextInput style={styles.textInput} placeholder="Misal: Sound System Pro" placeholderTextColor={colors.textMuted} value={vendorName} onChangeText={setVendorName} />
+
+              <Text style={styles.fieldLabel}>Kategori Vendor</Text>
+              <TextInput style={styles.textInput} placeholder="Misal: Audio / Lighting" placeholderTextColor={colors.textMuted} value={vendorCategory} onChangeText={setVendorCategory} />
+
+              <Text style={styles.fieldLabel}>Nilai Kontrak Deal (Rp)</Text>
+              <TextInput style={styles.textInput} keyboardType="numeric" placeholder="Misal: 15000000" placeholderTextColor={colors.textMuted} value={vendorContract} onChangeText={setVendorContract} />
+
+              <Text style={styles.fieldLabel}>Kontak Person (PIC)</Text>
+              <TextInput style={styles.textInput} placeholder="Misal: Mas Doni (0812...)" placeholderTextColor={colors.textMuted} value={vendorContact} onChangeText={setVendorContact} />
+
+              <Text style={styles.fieldLabel}>Status Kerjasama</Text>
+              <View style={styles.optionRow}>
+                {(['booked', 'shortlisted', 'completed'] as VendorItem['status'][]).map((st) => (
+                  <TouchableOpacity key={st} onPress={() => setVendorStatus(st)} style={[styles.optionChip, vendorStatus === st && styles.optionChipActive]}>
+                    <Text style={[styles.optionChipText, vendorStatus === st && styles.optionChipTextActive]}>
+                      {st === 'booked' ? 'Booked' : st === 'completed' ? 'Selesai' : 'Shortlist'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.modalActionRow}>
+                {editingId ? (
+                  <TouchableOpacity onPress={handleDelete} style={styles.deleteButton} activeOpacity={0.8}>
+                    <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                    <Text style={styles.deleteButtonText}>Hapus</Text>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity onPress={handleSaveVendor} style={[styles.saveButton, !vendorName.trim() && styles.saveButtonDisabled]} activeOpacity={0.8} disabled={!vendorName.trim()}>
+                  <Text style={styles.saveButtonText}>Simpan Vendor</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Transaction Modal */}
+      <Modal visible={modalType === 'transaction'} transparent animationType="slide" onRequestClose={() => setModalType(null)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setModalType(null)} />
+          <View style={styles.modalSheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.modalHeading}>{editingId ? 'Edit Transaksi' : 'Catat Transaksi Pengeluaran'}</Text>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={styles.fieldLabel}>Keterangan Pembayaran *</Text>
+              <TextInput style={styles.textInput} placeholder="Misal: DP 30% Katering Resepsi" placeholderTextColor={colors.textMuted} value={txNotes} onChangeText={setTxNotes} />
+
+              <Text style={styles.fieldLabel}>Nama Vendor Terkait</Text>
+              <TextInput style={styles.textInput} placeholder="Misal: Katering Selera Nusantara" placeholderTextColor={colors.textMuted} value={txVendor} onChangeText={setTxVendor} />
+
+              <Text style={styles.fieldLabel}>Nominal Pembayaran (Rp)</Text>
+              <TextInput style={styles.textInput} keyboardType="numeric" placeholder="Misal: 10000000" placeholderTextColor={colors.textMuted} value={txAmount} onChangeText={setTxAmount} />
+
+              <Text style={styles.fieldLabel}>Tanggal Transaksi</Text>
+              <TextInput style={styles.textInput} placeholder="Misal: 15 Apr 2027" placeholderTextColor={colors.textMuted} value={txDate} onChangeText={setTxDate} />
+
+              <Text style={styles.fieldLabel}>Dibayar Oleh</Text>
+              <View style={styles.optionRow}>
+                {(['groom', 'bride', 'family'] as TransactionItem['paidBy'][]).map((p) => (
+                  <TouchableOpacity key={p} onPress={() => setTxPaidBy(p)} style={[styles.optionChip, txPaidBy === p && styles.optionChipActive]}>
+                    <Text style={[styles.optionChipText, txPaidBy === p && styles.optionChipTextActive]}>
+                      {p === 'groom' ? 'Octa' : p === 'bride' ? 'Jenesia' : 'Keluarga'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.fieldLabel}>Status Pembayaran</Text>
+              <View style={styles.optionRow}>
+                {(['paid', 'pending'] as TransactionItem['status'][]).map((st) => (
+                  <TouchableOpacity key={st} onPress={() => setTxStatus(st)} style={[styles.optionChip, txStatus === st && styles.optionChipActive]}>
+                    <Text style={[styles.optionChipText, txStatus === st && styles.optionChipTextActive]}>
+                      {st === 'paid' ? 'Lunas' : 'Pending'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.modalActionRow}>
+                {editingId ? (
+                  <TouchableOpacity onPress={handleDelete} style={styles.deleteButton} activeOpacity={0.8}>
+                    <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                    <Text style={styles.deleteButtonText}>Hapus</Text>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity onPress={handleSaveTx} style={[styles.saveButton, !txNotes.trim() && styles.saveButtonDisabled]} activeOpacity={0.8} disabled={!txNotes.trim()}>
+                  <Text style={styles.saveButtonText}>Simpan Transaksi</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -230,13 +605,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.xl,
   },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.accent,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    gap: 4,
+  },
+  addButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textLight,
+  },
   statGrid: {
     flexDirection: 'row',
     gap: 10,
     marginBottom: spacing.md,
   },
   segmented: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  hintContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: spacing.sm,
+    paddingHorizontal: 2,
+  },
+  hintText: {
+    fontSize: 11,
+    color: colors.textMuted,
   },
   listCard: {
     paddingVertical: 6,
@@ -294,5 +694,120 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 6,
     marginTop: 8,
+  },
+  // Bottom-sheet Modal Styles
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
+  modalBackdrop: {
+    flex: 1,
+  },
+  modalSheet: {
+    backgroundColor: colors.cardBg,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: spacing.lg,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    maxHeight: '85%',
+  },
+  sheetHandle: {
+    width: 38,
+    height: 4,
+    backgroundColor: colors.borderDark,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  modalHeading: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 16,
+    letterSpacing: -0.3,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  textInput: {
+    backgroundColor: colors.bg,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: colors.textPrimary,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  optionChip: {
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bg,
+  },
+  optionChipActive: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
+  },
+  optionChipText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.textSecondary,
+  },
+  optionChipTextActive: {
+    color: colors.textLight,
+    fontWeight: '600',
+  },
+  modalActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 22,
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  saveButton: {
+    flex: 1,
+    backgroundColor: colors.accent,
+    paddingVertical: 13,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonDisabled: {
+    opacity: 0.5,
+  },
+  saveButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textLight,
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    gap: 4,
+  },
+  deleteButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.danger,
   },
 });

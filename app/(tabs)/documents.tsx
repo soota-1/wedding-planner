@@ -5,8 +5,11 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  LayoutAnimation,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
   Platform,
+  LayoutAnimation,
   UIManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -94,6 +97,20 @@ export default function DocumentsScreen() {
   const [docs, setDocs] = useState<DocumentItem[]>(initialDocuments);
   const [catIndex, setCatIndex] = useState(0);
 
+  // Modal State
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Form State
+  const [docTitle, setDocTitle] = useState('');
+  const [docType, setDocType] = useState('');
+  const [docCategory, setDocCategory] = useState<DocumentItem['category']>('church_canonical');
+  const [docOwner, setDocOwner] = useState<DocumentItem['owner']>('both');
+  const [docIssueDate, setDocIssueDate] = useState('');
+  const [docStatus, setDocStatus] = useState<DocumentItem['status']>('verified');
+  const [docNotes, setDocNotes] = useState('');
+
+  // Single tap: cycle status
   const toggleDocStatus = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setDocs((prev) =>
@@ -104,6 +121,78 @@ export default function DocumentsScreen() {
         return { ...d, status: nextStatus };
       })
     );
+  };
+
+  // Open Add Modal
+  const openAddModal = () => {
+    setEditingId(null);
+    setDocTitle('');
+    setDocType('Kanonik Katolik');
+    setDocCategory(catIndex === 2 ? 'civil_disdukcapil' : 'church_canonical');
+    setDocOwner('both');
+    setDocIssueDate('');
+    setDocStatus('verified');
+    setDocNotes('');
+    setModalVisible(true);
+  };
+
+  // Open Edit Modal on Long Press
+  const openEditModal = (d: DocumentItem) => {
+    setEditingId(d.id);
+    setDocTitle(d.title);
+    setDocType(d.documentType);
+    setDocCategory(d.category);
+    setDocOwner(d.owner);
+    setDocIssueDate(d.issueDate || '');
+    setDocStatus(d.status);
+    setDocNotes(d.notes || '');
+    setModalVisible(true);
+  };
+
+  // Save Document
+  const handleSaveDoc = () => {
+    if (!docTitle.trim()) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
+    if (editingId) {
+      setDocs((prev) =>
+        prev.map((d) =>
+          d.id === editingId
+            ? {
+                ...d,
+                title: docTitle.trim(),
+                documentType: docType.trim() || 'Dokumen Persyaratan',
+                category: docCategory,
+                owner: docOwner,
+                issueDate: docIssueDate.trim() || undefined,
+                status: docStatus,
+                notes: docNotes.trim() || undefined,
+              }
+            : d
+        )
+      );
+    } else {
+      const newDoc: DocumentItem = {
+        id: Date.now().toString(),
+        title: docTitle.trim(),
+        documentType: docType.trim() || 'Dokumen Persyaratan',
+        category: docCategory,
+        owner: docOwner,
+        issueDate: docIssueDate.trim() || undefined,
+        status: docStatus,
+        notes: docNotes.trim() || undefined,
+      };
+      setDocs((prev) => [newDoc, ...prev]);
+    }
+    setModalVisible(false);
+  };
+
+  // Delete Document
+  const handleDeleteDoc = () => {
+    if (!editingId) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setDocs((prev) => prev.filter((d) => d.id !== editingId));
+    setModalVisible(false);
   };
 
   const verifiedCount = docs.filter((d) => d.status === 'verified').length;
@@ -126,7 +215,13 @@ export default function DocumentsScreen() {
         <Header
           kicker="Kanonik & Legal"
           title="Dokumen"
-          subtitle={`${verifiedCount} dari ${docs.length} berkas siap • Ketuk untuk ubah status`}
+          subtitle={`${verifiedCount} dari ${docs.length} berkas siap`}
+          rightElement={
+            <TouchableOpacity onPress={openAddModal} activeOpacity={0.8} style={styles.addButton}>
+              <Ionicons name="add" size={18} color={colors.textLight} />
+              <Text style={styles.addButtonText}>Dokumen</Text>
+            </TouchableOpacity>
+          }
         />
 
         {/* Compliance Hero */}
@@ -139,7 +234,7 @@ export default function DocumentsScreen() {
             <ProgressBar progress={complianceRate} height={7} style={{ marginVertical: 10 }} />
             <Text style={styles.cardSub}>
               {expiredCount > 0
-                ? `${expiredCount} dokumen kedaluwarsa perlu pembaruan sebelum kanonik.`
+                ? `${expiredCount} dokumen kedaluwarsa perlu pembaruan sebelum penyelidikan kanonik.`
                 : 'Seluruh dokumen utama memenuhi syarat hukum kanonik & sipil.'}
             </Text>
           </Card>
@@ -165,6 +260,12 @@ export default function DocumentsScreen() {
           onChange={setCatIndex}
         />
 
+        {/* Helper Hint */}
+        <View style={styles.hintContainer}>
+          <Ionicons name="information-circle-outline" size={13} color={colors.textMuted} />
+          <Text style={styles.hintText}>Ketuk baris untuk status berkas • Tekan lama untuk edit / hapus</Text>
+        </View>
+
         <FadeInView delay={150}>
           <Card style={styles.listCard}>
             {filteredDocs.map((doc, idx) => (
@@ -172,6 +273,8 @@ export default function DocumentsScreen() {
                 key={doc.id}
                 activeOpacity={0.7}
                 onPress={() => toggleDocStatus(doc.id)}
+                onLongPress={() => openEditModal(doc)}
+                delayLongPress={300}
                 style={[styles.docRow, idx === filteredDocs.length - 1 && styles.rowLast]}
               >
                 <View style={styles.docHeader}>
@@ -208,6 +311,74 @@ export default function DocumentsScreen() {
           </Card>
         </FadeInView>
       </ScrollView>
+
+      {/* Document Modal */}
+      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setModalVisible(false)} />
+          <View style={styles.modalSheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.modalHeading}>{editingId ? 'Edit Dokumen Persyaratan' : 'Tambah Dokumen Baru'}</Text>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={styles.fieldLabel}>Nama Dokumen *</Text>
+              <TextInput style={styles.textInput} placeholder="Misal: Surat Baptis Terbaru" placeholderTextColor={colors.textMuted} value={docTitle} onChangeText={setDocTitle} />
+
+              <Text style={styles.fieldLabel}>Jenis Dokumen</Text>
+              <TextInput style={styles.textInput} placeholder="Misal: Surat Baptis Katolik, KTP, dll" placeholderTextColor={colors.textMuted} value={docType} onChangeText={setDocType} />
+
+              <Text style={styles.fieldLabel}>Kategori Persyaratan</Text>
+              <View style={styles.optionRow}>
+                <TouchableOpacity onPress={() => setDocCategory('church_canonical')} style={[styles.optionChip, docCategory === 'church_canonical' && styles.optionChipActive]}>
+                  <Text style={[styles.optionChipText, docCategory === 'church_canonical' && styles.optionChipTextActive]}>Kanonik Katolik</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setDocCategory('civil_disdukcapil')} style={[styles.optionChip, docCategory === 'civil_disdukcapil' && styles.optionChipActive]}>
+                  <Text style={[styles.optionChipText, docCategory === 'civil_disdukcapil' && styles.optionChipTextActive]}>Sipil Disdukcapil</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.fieldLabel}>Pemilik Berkas</Text>
+              <View style={styles.optionRow}>
+                {(['both', 'groom', 'bride'] as DocumentItem['owner'][]).map((ow) => (
+                  <TouchableOpacity key={ow} onPress={() => setDocOwner(ow)} style={[styles.optionChip, docOwner === ow && styles.optionChipActive]}>
+                    <Text style={[styles.optionChipText, docOwner === ow && styles.optionChipTextActive]}>
+                      {ow === 'both' ? 'Bersama' : ow === 'groom' ? 'Octa' : 'Jenesia'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.fieldLabel}>Tanggal Penerbitan Berkas</Text>
+              <TextInput style={styles.textInput} placeholder="Misal: 12 Jul 2027 (Wajib cek 180 hari)" placeholderTextColor={colors.textMuted} value={docIssueDate} onChangeText={setDocIssueDate} />
+
+              <Text style={styles.fieldLabel}>Status Keabsahan</Text>
+              <View style={styles.optionRow}>
+                {(['verified', 'pending', 'expired'] as DocumentItem['status'][]).map((st) => (
+                  <TouchableOpacity key={st} onPress={() => setDocStatus(st)} style={[styles.optionChip, docStatus === st && styles.optionChipActive]}>
+                    <Text style={[styles.optionChipText, docStatus === st && styles.optionChipTextActive]}>
+                      {st === 'verified' ? 'Sah' : st === 'expired' ? 'Kedaluwarsa' : 'Pending'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.fieldLabel}>Catatan Tambahan</Text>
+              <TextInput style={[styles.textInput, styles.notesInput]} placeholder="Misal: Hubungi sekretariat paroki asal..." placeholderTextColor={colors.textMuted} value={docNotes} onChangeText={setDocNotes} multiline numberOfLines={2} />
+
+              <View style={styles.modalActionRow}>
+                {editingId ? (
+                  <TouchableOpacity onPress={handleDeleteDoc} style={styles.deleteButton} activeOpacity={0.8}>
+                    <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                    <Text style={styles.deleteButtonText}>Hapus</Text>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity onPress={handleSaveDoc} style={[styles.saveButton, !docTitle.trim() && styles.saveButtonDisabled]} activeOpacity={0.8} disabled={!docTitle.trim()}>
+                  <Text style={styles.saveButtonText}>Simpan Dokumen</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -224,6 +395,20 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.xl,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.accent,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    gap: 4,
+  },
+  addButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textLight,
   },
   rowBetween: {
     flexDirection: 'row',
@@ -251,6 +436,7 @@ const styles = StyleSheet.create({
     borderLeftColor: colors.accent,
     paddingVertical: 14,
     paddingHorizontal: 16,
+    marginVertical: spacing.xs,
   },
   canonHeader: {
     flexDirection: 'row',
@@ -271,6 +457,17 @@ const styles = StyleSheet.create({
   bold: {
     fontWeight: '700',
     color: colors.textPrimary,
+  },
+  hintContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginVertical: spacing.sm,
+    paddingHorizontal: 2,
+  },
+  hintText: {
+    fontSize: 11,
+    color: colors.textMuted,
   },
   listCard: {
     paddingVertical: 6,
@@ -308,5 +505,124 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 6,
     lineHeight: 17,
+  },
+  // Modal Bottom-sheet styles
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
+  modalBackdrop: {
+    flex: 1,
+  },
+  modalSheet: {
+    backgroundColor: colors.cardBg,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: spacing.lg,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    maxHeight: '85%',
+  },
+  sheetHandle: {
+    width: 38,
+    height: 4,
+    backgroundColor: colors.borderDark,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  modalHeading: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 16,
+    letterSpacing: -0.3,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  textInput: {
+    backgroundColor: colors.bg,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: colors.textPrimary,
+  },
+  notesInput: {
+    minHeight: 56,
+    textAlignVertical: 'top',
+  },
+  optionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  optionChip: {
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bg,
+  },
+  optionChipActive: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
+  },
+  optionChipText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.textSecondary,
+  },
+  optionChipTextActive: {
+    color: colors.textLight,
+    fontWeight: '600',
+  },
+  modalActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 22,
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  saveButton: {
+    flex: 1,
+    backgroundColor: colors.accent,
+    paddingVertical: 13,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonDisabled: {
+    opacity: 0.5,
+  },
+  saveButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textLight,
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    gap: 4,
+  },
+  deleteButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.danger,
   },
 });
