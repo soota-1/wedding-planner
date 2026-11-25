@@ -236,6 +236,12 @@ export default function ChecklistScreen() {
           ) : null}
         </View>
 
+        {/* Helper Cue */}
+        <View style={styles.hintContainer}>
+          <Ionicons name="information-circle-outline" size={13} color={colors.textMuted} />
+          <Text style={styles.hintText}>Ketuk baris untuk centang • Tekan lama untuk edit / hapus</Text>
+        </View>
+
         {/* Scrollable Category Pills */}
         <FilterChipBar
           options={categoryLabels}
@@ -252,57 +258,51 @@ export default function ChecklistScreen() {
         ) : (
           <Card style={styles.listCard}>
             {filteredTasks.map((t, index) => (
-              <View
+              <TouchableOpacity
                 key={t.id}
+                activeOpacity={0.7}
+                onPress={() => toggleTask(t.id)}
+                onLongPress={() => openEditModal(t)}
+                delayLongPress={300}
                 style={[
                   styles.taskRow,
                   index === filteredTasks.length - 1 && styles.taskRowLast,
                 ]}
               >
-                {/* Checkbox Area (Toggle Complete) */}
-                <TouchableOpacity
-                  onPress={() => toggleTask(t.id)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  style={[styles.checkbox, t.completed && styles.checkboxChecked]}
-                >
+                {/* Visual Checkbox */}
+                <View style={[styles.checkbox, t.completed && styles.checkboxChecked]}>
                   {t.completed ? (
                     <Ionicons name="checkmark" size={14} color={colors.textLight} />
                   ) : null}
-                </TouchableOpacity>
+                </View>
 
-                {/* Task Body Area (Tap to Edit / Delete) */}
-                <TouchableOpacity
-                  activeOpacity={0.65}
-                  onPress={() => openEditModal(t)}
-                  style={styles.taskInteractiveBody}
-                >
-                  <View style={styles.taskBody}>
-                    <Text
-                      style={[styles.taskTitle, t.completed && styles.taskTitleCompleted]}
-                      numberOfLines={2}
-                    >
-                      {t.title}
-                    </Text>
-                    <Text style={styles.taskMeta} numberOfLines={1}>
-                      {t.dueDate} • H{t.offsetDays} •{' '}
-                      {t.pic === 'groom' ? 'Octa' : t.pic === 'bride' ? 'Jenesia' : 'Berdua'}
-                    </Text>
-                  </View>
+                {/* Task Details */}
+                <View style={styles.taskBody}>
+                  <Text
+                    style={[styles.taskTitle, t.completed && styles.taskTitleCompleted]}
+                    numberOfLines={2}
+                  >
+                    {t.title}
+                  </Text>
+                  <Text style={styles.taskMeta} numberOfLines={1}>
+                    {t.dueDate} • H{t.offsetDays} •{' '}
+                    {t.pic === 'groom' ? 'Octa' : t.pic === 'bride' ? 'Jenesia' : 'Berdua'}
+                  </Text>
+                </View>
 
-                  <View style={styles.taskBadgeCol}>
-                    {t.priority === 'critical' ? (
-                      <Badge label="Kritis" variant="danger" />
-                    ) : t.priority === 'high' ? (
-                      <Badge label="Penting" variant="warning" />
-                    ) : t.priority === 'medium' ? (
-                      <Badge label="Normal" variant="neutral" />
-                    ) : (
-                      <Badge label="Rendah" variant="info" />
-                    )}
-                    <Ionicons name="create-outline" size={15} color={colors.textMuted} />
-                  </View>
-                </TouchableOpacity>
-              </View>
+                {/* Priority Badge */}
+                <View style={styles.taskBadgeCol}>
+                  {t.priority === 'critical' ? (
+                    <Badge label="Kritis" variant="danger" />
+                  ) : t.priority === 'high' ? (
+                    <Badge label="Penting" variant="warning" />
+                  ) : t.priority === 'medium' ? (
+                    <Badge label="Normal" variant="neutral" />
+                  ) : (
+                    <Badge label="Rendah" variant="info" />
+                  )}
+                </View>
+              </TouchableOpacity>
             ))}
           </Card>
         )}
@@ -510,8 +510,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 12,
-    marginBottom: spacing.md,
+    marginBottom: spacing.xs,
     gap: 8,
+  },
+  hintContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: spacing.sm,
+    paddingHorizontal: 2,
+  },
+  hintText: {
+    fontSize: 11,
+    color: colors.textMuted,
   },
   searchInput: {
     flex: 1,
