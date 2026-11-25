@@ -7,12 +7,14 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
+  KeyboardAvoidingView,
   LayoutAnimation,
   Platform,
   UIManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { subDays, format } from 'date-fns';
 import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 import { Card } from '../../src/components/common/Card';
@@ -25,16 +27,22 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+type TaskCategory = 'canonical' | 'civil' | 'liturgy' | 'vendor';
+type TaskPriority = 'critical' | 'high' | 'medium' | 'low';
+type TaskPic = 'groom' | 'bride' | 'both';
+
 interface ChecklistItem {
   id: string;
   title: string;
-  category: 'canonical' | 'civil' | 'liturgy' | 'vendor';
+  category: TaskCategory;
   dueDate: string;
   offsetDays: number;
-  priority: 'critical' | 'high' | 'medium' | 'low';
-  pic: 'groom' | 'bride' | 'both';
+  priority: TaskPriority;
+  pic: TaskPic;
   completed: boolean;
 }
+
+const WEDDING_DATE = new Date('2027-10-10T00:00:00.000Z');
 
 const initialTasks: ChecklistItem[] = [
   { id: '1', title: 'Kursus Persiapan Perkawinan (KPP)', category: 'canonical', dueDate: '13 Apr 2027', offsetDays: -180, priority: 'critical', pic: 'both', completed: true },
@@ -51,12 +59,75 @@ const initialTasks: ChecklistItem[] = [
 const categoryLabels = ['Semua', 'Kanonik & KPP', 'Sipil', 'Liturgi', 'Vendor'];
 const categoryKeys = ['all', 'canonical', 'civil', 'liturgy', 'vendor'];
 
+const priorityOptions: { key: TaskPriority; label: string }[] = [
+  { key: 'critical', label: 'Kritis' },
+  { key: 'high', label: 'Penting' },
+  { key: 'medium', label: 'Normal' },
+  { key: 'low', label: 'Rendah' },
+];
+
+const formCategoryOptions: { key: TaskCategory; label: string }[] = [
+  { key: 'canonical', label: 'Kanonik' },
+  { key: 'civil', label: 'Sipil' },
+  { key: 'liturgy', label: 'Liturgi' },
+  { key: 'vendor', label: 'Vendor' },
+];
+
+const picOptions: { key: TaskPic; label: string }[] = [
+  { key: 'both', label: 'Berdua' },
+  { key: 'groom', label: 'Octa' },
+  { key: 'bride', label: 'Jenesia' },
+];
+
+const datePresets = [
+  { label: 'H-180', offset: -180 },
+  { label: 'H-90', offset: -90 },
+  { label: 'H-30', offset: -30 },
+  { label: 'H-7', offset: -7 },
+];
+
 export default function ChecklistScreen() {
   const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [tasks, setTasks] = useState<ChecklistItem[]>(initialTasks);
+
+  // Modal Form State (supports both Add and Edit)
   const [modalVisible, setModalVisible] = useState(false);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [formTitle, setFormTitle] = useState('');
+  const [formCategory, setFormCategory] = useState<TaskCategory>('canonical');
+  const [formPriority, setFormPriority] = useState<TaskPriority>('medium');
+  const [formPic, setFormPic] = useState<TaskPic>('both');
+  const [formDueDate, setFormDueDate] = useState('10 Sep 2027');
+  const [formOffsetDays, setFormOffsetDays] = useState(-30);
+
+  const openAddModal = () => {
+    setEditingTaskId(null);
+    setFormTitle('');
+    setFormCategory('canonical');
+    setFormPriority('medium');
+    setFormPic('both');
+    setFormDueDate('10 Sep 2027');
+    setFormOffsetDays(-30);
+    setModalVisible(true);
+  };
+
+  const openEditModal = (item: ChecklistItem) => {
+    setEditingTaskId(item.id);
+    setFormTitle(item.title);
+    setFormCategory(item.category);
+    setFormPriority(item.priority);
+    setFormPic(item.pic);
+    setFormDueDate(item.dueDate);
+    setFormOffsetDays(item.offsetDays);
+    setModalVisible(true);
+  };
+
+  const applyDatePreset = (offset: number) => {
+    const targetDate = subDays(WEDDING_DATE, Math.abs(offset));
+    setFormOffsetDays(offset);
+    setFormDueDate(format(targetDate, 'dd MMM yyyy'));
+  };
 
   const toggleTask = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -65,22 +136,48 @@ export default function ChecklistScreen() {
     );
   };
 
-  const handleAddTask = () => {
-    const trimmed = newTaskTitle.trim();
+  const handleSaveTask = () => {
+    const trimmed = formTitle.trim();
     if (!trimmed) return;
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    const created: ChecklistItem = {
-      id: Date.now().toString(),
-      title: trimmed,
-      category: 'canonical',
-      dueDate: 'Segera',
-      offsetDays: -30,
-      priority: 'medium',
-      pic: 'both',
-      completed: false,
-    };
-    setTasks((prev) => [created, ...prev]);
-    setNewTaskTitle('');
+
+    if (editingTaskId) {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === editingTaskId
+            ? {
+                ...t,
+                title: trimmed,
+                category: formCategory,
+                priority: formPriority,
+                pic: formPic,
+                dueDate: formDueDate.trim() || t.dueDate,
+                offsetDays: formOffsetDays,
+              }
+            : t
+        )
+      );
+    } else {
+      const created: ChecklistItem = {
+        id: Date.now().toString(),
+        title: trimmed,
+        category: formCategory,
+        dueDate: formDueDate.trim() || 'Segera',
+        offsetDays: formOffsetDays,
+        priority: formPriority,
+        pic: formPic,
+        completed: false,
+      };
+      setTasks((prev) => [created, ...prev]);
+    }
+
+    setModalVisible(false);
+  };
+
+  const handleDeleteTask = () => {
+    if (!editingTaskId) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setTasks((prev) => prev.filter((t) => t.id !== editingTaskId));
     setModalVisible(false);
   };
 
@@ -107,7 +204,7 @@ export default function ChecklistScreen() {
           subtitle={`${completedCount} dari ${tasks.length} langkah selesai`}
           rightElement={
             <TouchableOpacity
-              onPress={() => setModalVisible(true)}
+              onPress={openAddModal}
               activeOpacity={0.8}
               style={styles.addButton}
             >
@@ -155,79 +252,221 @@ export default function ChecklistScreen() {
         ) : (
           <Card style={styles.listCard}>
             {filteredTasks.map((t, index) => (
-              <TouchableOpacity
+              <View
                 key={t.id}
-                activeOpacity={0.7}
-                onPress={() => toggleTask(t.id)}
                 style={[
                   styles.taskRow,
                   index === filteredTasks.length - 1 && styles.taskRowLast,
                 ]}
               >
-                <View style={[styles.checkbox, t.completed && styles.checkboxChecked]}>
+                {/* Checkbox Area (Toggle Complete) */}
+                <TouchableOpacity
+                  onPress={() => toggleTask(t.id)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  style={[styles.checkbox, t.completed && styles.checkboxChecked]}
+                >
                   {t.completed ? (
                     <Ionicons name="checkmark" size={14} color={colors.textLight} />
                   ) : null}
-                </View>
+                </TouchableOpacity>
 
-                <View style={styles.taskBody}>
-                  <Text
-                    style={[styles.taskTitle, t.completed && styles.taskTitleCompleted]}
-                    numberOfLines={2}
-                  >
-                    {t.title}
-                  </Text>
-                  <Text style={styles.taskMeta} numberOfLines={1}>
-                    {t.dueDate} • H{t.offsetDays} •{' '}
-                    {t.pic === 'groom' ? 'Octa' : t.pic === 'bride' ? 'Jenesia' : 'Berdua'}
-                  </Text>
-                </View>
+                {/* Task Body Area (Tap to Edit / Delete) */}
+                <TouchableOpacity
+                  activeOpacity={0.65}
+                  onPress={() => openEditModal(t)}
+                  style={styles.taskInteractiveBody}
+                >
+                  <View style={styles.taskBody}>
+                    <Text
+                      style={[styles.taskTitle, t.completed && styles.taskTitleCompleted]}
+                      numberOfLines={2}
+                    >
+                      {t.title}
+                    </Text>
+                    <Text style={styles.taskMeta} numberOfLines={1}>
+                      {t.dueDate} • H{t.offsetDays} •{' '}
+                      {t.pic === 'groom' ? 'Octa' : t.pic === 'bride' ? 'Jenesia' : 'Berdua'}
+                    </Text>
+                  </View>
 
-                <View style={styles.taskBadgeCol}>
-                  {t.priority === 'critical' ? (
-                    <Badge label="Kritis" variant="danger" />
-                  ) : t.priority === 'high' ? (
-                    <Badge label="Penting" variant="warning" />
-                  ) : null}
-                </View>
-              </TouchableOpacity>
+                  <View style={styles.taskBadgeCol}>
+                    {t.priority === 'critical' ? (
+                      <Badge label="Kritis" variant="danger" />
+                    ) : t.priority === 'high' ? (
+                      <Badge label="Penting" variant="warning" />
+                    ) : t.priority === 'medium' ? (
+                      <Badge label="Normal" variant="neutral" />
+                    ) : (
+                      <Badge label="Rendah" variant="info" />
+                    )}
+                    <Ionicons name="create-outline" size={15} color={colors.textMuted} />
+                  </View>
+                </TouchableOpacity>
+              </View>
             ))}
           </Card>
         )}
       </ScrollView>
 
-      {/* Bottom-Sheet Modal Tambah Tugas */}
+      {/* Keyboard-Safe Bottom-Sheet Modal for Create & Edit Task */}
       <Modal
         visible={modalVisible}
         transparent
         animationType="slide"
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Tambah Tugas Baru</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
+              <Text style={styles.modalTitle}>
+                {editingTaskId ? 'Edit Tugas' : 'Tambah Tugas Baru'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setModalVisible(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
                 <Ionicons name="close" size={22} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
-            <TextInput
-              placeholder="Misal: Fitting jas pengantin Octa"
-              placeholderTextColor={colors.textMuted}
-              value={newTaskTitle}
-              onChangeText={setNewTaskTitle}
-              style={styles.modalInput}
-              autoFocus
-            />
-            <TouchableOpacity
-              onPress={handleAddTask}
-              activeOpacity={0.85}
-              style={styles.modalSaveBtn}
+
+            <ScrollView
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
             >
-              <Text style={styles.modalSaveText}>Simpan ke Checklist</Text>
-            </TouchableOpacity>
+              {/* Input Judul */}
+              <Text style={styles.fieldLabel}>Nama Tugas</Text>
+              <TextInput
+                placeholder="Misal: Fitting jas pengantin Octa"
+                placeholderTextColor={colors.textMuted}
+                value={formTitle}
+                onChangeText={setFormTitle}
+                style={styles.modalInput}
+                autoFocus={!editingTaskId}
+              />
+
+              {/* Prioritas Dropdown / Selector Chips */}
+              <Text style={styles.fieldLabel}>Tingkat Prioritas</Text>
+              <View style={styles.pillRow}>
+                {priorityOptions.map((opt) => {
+                  const active = formPriority === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      onPress={() => setFormPriority(opt.key)}
+                      style={[
+                        styles.selectPill,
+                        active && styles.selectPillActive,
+                        active && opt.key === 'critical' && { backgroundColor: colors.danger, borderColor: colors.danger },
+                        active && opt.key === 'high' && { backgroundColor: colors.warning, borderColor: colors.warning },
+                      ]}
+                    >
+                      <Text style={[styles.selectPillText, active && styles.selectPillTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Tanggal Jatuh Tempo + Quick Presets */}
+              <Text style={styles.fieldLabel}>Tanggal Jatuh Tempo</Text>
+              <TextInput
+                placeholder="Misal: 15 Mei 2027"
+                placeholderTextColor={colors.textMuted}
+                value={formDueDate}
+                onChangeText={setFormDueDate}
+                style={styles.modalInput}
+              />
+              <View style={[styles.pillRow, { marginTop: -8, marginBottom: 14 }]}>
+                {datePresets.map((p) => (
+                  <TouchableOpacity
+                    key={p.label}
+                    onPress={() => applyDatePreset(p.offset)}
+                    style={[
+                      styles.presetChip,
+                      formOffsetDays === p.offset && styles.presetChipActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.presetChipText,
+                        formOffsetDays === p.offset && styles.presetChipTextActive,
+                      ]}
+                    >
+                      {p.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Kategori */}
+              <Text style={styles.fieldLabel}>Kategori</Text>
+              <View style={styles.pillRow}>
+                {formCategoryOptions.map((opt) => {
+                  const active = formCategory === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      onPress={() => setFormCategory(opt.key)}
+                      style={[styles.selectPill, active && styles.selectPillActive]}
+                    >
+                      <Text style={[styles.selectPillText, active && styles.selectPillTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Penanggung Jawab (PIC) */}
+              <Text style={styles.fieldLabel}>Penanggung Jawab (PIC)</Text>
+              <View style={styles.pillRow}>
+                {picOptions.map((opt) => {
+                  const active = formPic === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      onPress={() => setFormPic(opt.key)}
+                      style={[styles.selectPill, active && styles.selectPillActive]}
+                    >
+                      <Text style={[styles.selectPillText, active && styles.selectPillTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Action Buttons */}
+              <View style={styles.modalActions}>
+                {editingTaskId ? (
+                  <TouchableOpacity
+                    onPress={handleDeleteTask}
+                    activeOpacity={0.8}
+                    style={styles.modalDeleteBtn}
+                  >
+                    <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                    <Text style={styles.modalDeleteText}>Hapus</Text>
+                  </TouchableOpacity>
+                ) : null}
+
+                <TouchableOpacity
+                  onPress={handleSaveTask}
+                  activeOpacity={0.85}
+                  style={[styles.modalSaveBtn, { flex: 1 }]}
+                >
+                  <Text style={styles.modalSaveText}>
+                    {editingTaskId ? 'Simpan Perubahan' : 'Simpan Tugas'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -308,6 +547,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     borderColor: colors.accent,
   },
+  taskInteractiveBody: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   taskBody: {
     flex: 1,
     paddingRight: 8,
@@ -328,7 +572,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   taskBadgeCol: {
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   emptyCard: {
     padding: spacing.xl,
@@ -346,10 +592,11 @@ const styles = StyleSheet.create({
   },
   modalSheet: {
     backgroundColor: colors.cardBg,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
     padding: spacing.lg,
-    paddingBottom: 36,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 24,
+    maxHeight: '85%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -358,25 +605,98 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   modalTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: 6,
   },
   modalInput: {
     borderWidth: 1,
     borderColor: colors.borderDark,
+    backgroundColor: colors.bg,
     borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 11,
     fontSize: 14,
     color: colors.textPrimary,
-    marginBottom: spacing.md,
+    marginBottom: 14,
+  },
+  pillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  selectPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: spacing.borderRadiusPill,
+    borderWidth: 1,
+    borderColor: colors.borderDark,
+    backgroundColor: colors.cardBg,
+  },
+  selectPillActive: {
+    backgroundColor: colors.textPrimary,
+    borderColor: colors.textPrimary,
+  },
+  selectPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  selectPillTextActive: {
+    color: colors.textLight,
+  },
+  presetChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceMuted,
+  },
+  presetChipActive: {
+    backgroundColor: colors.accentLight,
+  },
+  presetChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  presetChipTextActive: {
+    color: colors.accentDark,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  modalDeleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    backgroundColor: colors.dangerBg,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+  },
+  modalDeleteText: {
+    color: colors.danger,
+    fontSize: 14,
+    fontWeight: '700',
   },
   modalSaveBtn: {
     backgroundColor: colors.accent,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   modalSaveText: {
     color: colors.textLight,
