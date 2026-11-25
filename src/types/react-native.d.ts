@@ -26,6 +26,8 @@ declare module 'react-native' {
   export const UIManager: any;
   export const Platform: any;
   export const Dimensions: any;
+  export const Linking: any;
+  export const Alert: any;
   export default RN;
 }
 

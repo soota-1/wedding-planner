@@ -11,6 +11,8 @@ import {
   Platform,
   LayoutAnimation,
   UIManager,
+  Linking,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -66,6 +68,16 @@ export default function BudgetScreen() {
   const [vendorContract, setVendorContract] = useState('');
   const [vendorStatus, setVendorStatus] = useState<VendorItem['status']>('booked');
   const [vendorContact, setVendorContact] = useState('');
+  const [vendorPhone, setVendorPhone] = useState('');
+  const [vendorEmail, setVendorEmail] = useState('');
+  const [vendorSocialMedia, setVendorSocialMedia] = useState('');
+  const [vendorNotes, setVendorNotes] = useState('');
+
+  // Vendor Detail Sheet state
+  const [selectedVendorForDetail, setSelectedVendorForDetail] = useState<VendorItem | null>(null);
+  const [newScheduleTitle, setNewScheduleTitle] = useState('');
+  const [newScheduleDate, setNewScheduleDate] = useState('');
+  const [showAddScheduleRow, setShowAddScheduleRow] = useState(false);
 
   // Transaction form state
   const [txNotes, setTxNotes] = useState('');
@@ -89,6 +101,10 @@ export default function BudgetScreen() {
       setVendorContract('');
       setVendorStatus('booked');
       setVendorContact('');
+      setVendorPhone('');
+      setVendorEmail('');
+      setVendorSocialMedia('');
+      setVendorNotes('');
       setModalType('vendor');
     } else {
       setTxNotes('');
@@ -117,6 +133,10 @@ export default function BudgetScreen() {
     setVendorContract(item.contractValue.toString());
     setVendorStatus(item.status);
     setVendorContact(item.contactPerson);
+    setVendorPhone(item.phone || '');
+    setVendorEmail(item.email || '');
+    setVendorSocialMedia(item.socialMedia || '');
+    setVendorNotes(item.notes || '');
     setModalType('vendor');
   };
 
@@ -150,6 +170,7 @@ export default function BudgetScreen() {
     if (!vendorName.trim()) return;
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     const contract = parseInt(vendorContract.replace(/[^0-9]/g, ''), 10) || 0;
+    const existing = editingId ? vendors.find((v) => v.id === editingId) : null;
 
     if (editingId) {
       updateVendor(editingId, {
@@ -158,7 +179,30 @@ export default function BudgetScreen() {
         contractValue: contract,
         status: vendorStatus,
         contactPerson: vendorContact.trim() || 'PIC',
+        phone: vendorPhone.trim() || undefined,
+        email: vendorEmail.trim() || undefined,
+        socialMedia: vendorSocialMedia.trim() || undefined,
+        notes: vendorNotes.trim() || undefined,
+        schedules: existing?.schedules || undefined,
       });
+      if (selectedVendorForDetail && selectedVendorForDetail.id === editingId) {
+        setSelectedVendorForDetail((prev) =>
+          prev
+            ? {
+                ...prev,
+                name: vendorName.trim(),
+                category: vendorCategory.trim() || 'Lainnya',
+                contractValue: contract,
+                status: vendorStatus,
+                contactPerson: vendorContact.trim() || 'PIC',
+                phone: vendorPhone.trim() || undefined,
+                email: vendorEmail.trim() || undefined,
+                socialMedia: vendorSocialMedia.trim() || undefined,
+                notes: vendorNotes.trim() || undefined,
+              }
+            : null
+        );
+      }
     } else {
       addVendor({
         name: vendorName.trim(),
@@ -166,6 +210,10 @@ export default function BudgetScreen() {
         contractValue: contract,
         status: vendorStatus,
         contactPerson: vendorContact.trim() || 'PIC',
+        phone: vendorPhone.trim() || undefined,
+        email: vendorEmail.trim() || undefined,
+        socialMedia: vendorSocialMedia.trim() || undefined,
+        notes: vendorNotes.trim() || undefined,
       });
     }
     setModalType(null);
@@ -198,6 +246,45 @@ export default function BudgetScreen() {
     setModalType(null);
   };
 
+  // Vendor Schedule Handlers inside Detail Sheet
+  const handleToggleSchedule = (scheduleId: string) => {
+    if (!selectedVendorForDetail) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const updatedSchedules = (selectedVendorForDetail.schedules || []).map((sc) =>
+      sc.id === scheduleId ? { ...sc, completed: !sc.completed } : sc
+    );
+    const updatedVendor = { ...selectedVendorForDetail, schedules: updatedSchedules };
+    updateVendor(selectedVendorForDetail.id, { schedules: updatedSchedules });
+    setSelectedVendorForDetail(updatedVendor);
+  };
+
+  const handleAddSchedule = () => {
+    if (!selectedVendorForDetail || !newScheduleTitle.trim()) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const newEntry = {
+      id: `vs_${Date.now()}`,
+      title: newScheduleTitle.trim(),
+      date: newScheduleDate.trim() || 'Segera',
+      completed: false,
+    };
+    const nextList = [...(selectedVendorForDetail.schedules || []), newEntry];
+    const updatedVendor = { ...selectedVendorForDetail, schedules: nextList };
+    updateVendor(selectedVendorForDetail.id, { schedules: nextList });
+    setSelectedVendorForDetail(updatedVendor);
+    setNewScheduleTitle('');
+    setNewScheduleDate('');
+    setShowAddScheduleRow(false);
+  };
+
+  const handleDeleteSchedule = (scheduleId: string) => {
+    if (!selectedVendorForDetail) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const nextList = (selectedVendorForDetail.schedules || []).filter((s) => s.id !== scheduleId);
+    const updatedVendor = { ...selectedVendorForDetail, schedules: nextList };
+    updateVendor(selectedVendorForDetail.id, { schedules: nextList });
+    setSelectedVendorForDetail(updatedVendor);
+  };
+
   // Delete Handlers
   const handleDelete = () => {
     if (!editingId) return;
@@ -206,6 +293,9 @@ export default function BudgetScreen() {
       deleteCategory(editingId);
     } else if (modalType === 'vendor') {
       deleteVendor(editingId);
+      if (selectedVendorForDetail && selectedVendorForDetail.id === editingId) {
+        setSelectedVendorForDetail(null);
+      }
     } else if (modalType === 'transaction') {
       deleteTransaction(editingId);
     }
@@ -319,40 +409,85 @@ export default function BudgetScreen() {
           </View>
         ) : activeTab === 1 ? (
           <View style={styles.cardStack}>
-            {vendors.map((v, idx) => (
-              <FadeInView key={v.id} delay={Math.min(idx * 45, 220)}>
-                <Card style={styles.itemCard}>
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onLongPress={() => openEditVendor(v)}
-                    delayLongPress={300}
-                  >
-                    <View style={styles.rowBetween}>
-                      <View style={styles.titleWithIcon}>
-                        <View style={styles.iconCircle}>
-                          <Ionicons name="storefront-outline" size={16} color={colors.accent} />
+            {vendors.map((v, idx) => {
+              const vendorTxs = transactions.filter(
+                (tx) => tx.vendorName?.toLowerCase() === v.name.toLowerCase()
+              );
+              const paidAmount = vendorTxs
+                .filter((tx) => tx.status === 'paid')
+                .reduce((sum, tx) => sum + tx.amount, 0);
+              const progressPct =
+                v.contractValue > 0 ? Math.min(100, Math.round((paidAmount / v.contractValue) * 100)) : 0;
+              const nextSchedule = (v.schedules || []).find((s) => !s.completed);
+
+              return (
+                <FadeInView key={v.id} delay={Math.min(idx * 45, 220)}>
+                  <Card style={styles.itemCard}>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => setSelectedVendorForDetail(v)}
+                      onLongPress={() => openEditVendor(v)}
+                      delayLongPress={300}
+                    >
+                      <View style={styles.rowBetween}>
+                        <View style={styles.titleWithIcon}>
+                          <View style={styles.iconCircle}>
+                            <Ionicons name="storefront-outline" size={16} color={colors.accent} />
+                          </View>
+                          <View style={styles.flexInfo}>
+                            <Text style={styles.itemTitle} numberOfLines={1}>
+                              {v.name}
+                            </Text>
+                            <Text style={styles.subLabel}>
+                              {v.category} • {v.contactPerson}
+                            </Text>
+                          </View>
                         </View>
-                        <View style={styles.flexInfo}>
-                          <Text style={styles.itemTitle} numberOfLines={1}>
-                            {v.name}
-                          </Text>
-                          <Text style={styles.subLabel}>
-                            {v.category} • {v.contactPerson}
-                          </Text>
-                        </View>
+                        <Badge
+                          label={
+                            v.status === 'booked'
+                              ? 'Booked'
+                              : v.status === 'completed'
+                              ? 'Selesai'
+                              : 'Shortlist'
+                          }
+                          variant={
+                            v.status === 'booked'
+                              ? 'success'
+                              : v.status === 'completed'
+                              ? 'neutral'
+                              : 'warning'
+                          }
+                        />
                       </View>
-                      <Badge
-                        label={v.status === 'booked' ? 'Booked' : v.status === 'completed' ? 'Selesai' : 'Shortlist'}
-                        variant={v.status === 'booked' ? 'success' : v.status === 'completed' ? 'neutral' : 'warning'}
-                      />
-                    </View>
-                    <Text style={styles.contractAmount}>
-                      Rp {v.contractValue.toLocaleString('id-ID')}
-                    </Text>
-                  </TouchableOpacity>
-                </Card>
-              </FadeInView>
-            ))}
+
+                      {/* Payment progress mini-bar */}
+                      <View style={{ marginTop: 10 }}>
+                        <View style={styles.rowBetween}>
+                          <Text style={styles.subLabel}>
+                            Terbayar: Rp {(paidAmount / 1000000).toFixed(1)} Jt ({progressPct}%)
+                          </Text>
+                          <Text style={styles.contractAmount}>
+                            Rp {v.contractValue.toLocaleString('id-ID')}
+                          </Text>
+                        </View>
+                        <ProgressBar progress={progressPct} height={5} style={{ marginTop: 4 }} />
+                      </View>
+
+                      {/* Next upcoming schedule preview if any */}
+                      {nextSchedule ? (
+                        <View style={styles.vendorNextScheduleRow}>
+                          <Ionicons name="time-outline" size={12} color={colors.accent} />
+                          <Text style={styles.vendorNextScheduleText} numberOfLines={1}>
+                            Agenda: {nextSchedule.title} ({nextSchedule.date})
+                          </Text>
+                        </View>
+                      ) : null}
+                    </TouchableOpacity>
+                  </Card>
+                </FadeInView>
+              );
+            })}
           </View>
         ) : (
           <View style={styles.cardStack}>
@@ -457,7 +592,19 @@ export default function BudgetScreen() {
               <TextInput style={styles.textInput} keyboardType="numeric" placeholder="Misal: 15000000" placeholderTextColor={colors.textMuted} value={vendorContract} onChangeText={setVendorContract} />
 
               <Text style={styles.fieldLabel}>Kontak Person (PIC)</Text>
-              <TextInput style={styles.textInput} placeholder="Misal: Mas Doni (0812...)" placeholderTextColor={colors.textMuted} value={vendorContact} onChangeText={setVendorContact} />
+              <TextInput style={styles.textInput} placeholder="Misal: Mas Doni (Manager)" placeholderTextColor={colors.textMuted} value={vendorContact} onChangeText={setVendorContact} />
+
+              <Text style={styles.fieldLabel}>Nomor WhatsApp / Telepon</Text>
+              <TextInput style={styles.textInput} keyboardType="phone-pad" placeholder="Misal: 08123456789" placeholderTextColor={colors.textMuted} value={vendorPhone} onChangeText={setVendorPhone} />
+
+              <Text style={styles.fieldLabel}>Email Vendor</Text>
+              <TextInput style={styles.textInput} keyboardType="email-address" autoCapitalize="none" placeholder="Misal: vendor@wedding.com" placeholderTextColor={colors.textMuted} value={vendorEmail} onChangeText={setVendorEmail} />
+
+              <Text style={styles.fieldLabel}>Instagram / Akun Sosmed</Text>
+              <TextInput style={styles.textInput} autoCapitalize="none" placeholder="Misal: @vendor_official" placeholderTextColor={colors.textMuted} value={vendorSocialMedia} onChangeText={setVendorSocialMedia} />
+
+              <Text style={styles.fieldLabel}>Catatan Kesepakatan & Klausul</Text>
+              <TextInput style={[styles.textInput, { height: 70, textAlignVertical: 'top' }]} multiline placeholder="Misal: Bonus 2 pondokan, serah terima H+7" placeholderTextColor={colors.textMuted} value={vendorNotes} onChangeText={setVendorNotes} />
 
               <Text style={styles.fieldLabel}>Status Kerjasama</Text>
               <View style={styles.optionRow}>
@@ -541,6 +688,316 @@ export default function BudgetScreen() {
               </View>
             </ScrollView>
           </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Dedicated Vendor Management & Detail Sheet */}
+      <Modal
+        visible={!!selectedVendorForDetail}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedVendorForDetail(null)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setSelectedVendorForDetail(null)}
+          />
+          {selectedVendorForDetail ? (
+            <View style={[styles.modalSheet, { maxHeight: '90%' }]}>
+              <View style={styles.sheetHandle} />
+
+              {/* Vendor Sheet Header */}
+              <View style={styles.vendorSheetHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.vendorSheetCategory}>
+                    {selectedVendorForDetail.category}
+                  </Text>
+                  <Text style={styles.vendorSheetTitle}>
+                    {selectedVendorForDetail.name}
+                  </Text>
+                  <Text style={styles.vendorSheetPic}>
+                    PIC: {selectedVendorForDetail.contactPerson}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    const target = selectedVendorForDetail;
+                    setSelectedVendorForDetail(null);
+                    openEditVendor(target);
+                  }}
+                  style={styles.vendorEditIconBtn}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="create-outline" size={18} color={colors.accent} />
+                  <Text style={styles.vendorEditIconText}>Edit</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{ paddingBottom: 24 }}
+              >
+                {/* 1. Quick Communication Actions */}
+                <Text style={styles.detailSectionTitle}>Kontak & Komunikasi</Text>
+                <View style={styles.contactRow}>
+                  {selectedVendorForDetail.phone ? (
+                    <>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          const cleanPhone = selectedVendorForDetail.phone!.replace(/[^0-9]/g, '');
+                          const waPhone = cleanPhone.startsWith('0') ? `62${cleanPhone.slice(1)}` : cleanPhone;
+                          Linking.openURL(`https://wa.me/${waPhone}`).catch(() => {
+                            Alert.alert('Gagal', 'Tidak dapat membuka WhatsApp.');
+                          });
+                        }}
+                        style={[styles.contactActionBtn, { backgroundColor: '#25D366' }]}
+                      >
+                        <Ionicons name="logo-whatsapp" size={16} color="#FFF" />
+                        <Text style={styles.contactActionText}>WhatsApp</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          Linking.openURL(`tel:${selectedVendorForDetail.phone}`).catch(() => {
+                            Alert.alert('Gagal', 'Tidak dapat melakukan panggilan telepon.');
+                          });
+                        }}
+                        style={[styles.contactActionBtn, { backgroundColor: colors.accent }]}
+                      >
+                        <Ionicons name="call-outline" size={16} color="#FFF" />
+                        <Text style={styles.contactActionText}>Telepon</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : null}
+
+                  {selectedVendorForDetail.email ? (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        Linking.openURL(`mailto:${selectedVendorForDetail.email}`).catch(() => {});
+                      }}
+                      style={[styles.contactActionBtn, { backgroundColor: '#4285F4' }]}
+                    >
+                      <Ionicons name="mail-outline" size={16} color="#FFF" />
+                      <Text style={styles.contactActionText}>Email</Text>
+                    </TouchableOpacity>
+                  ) : null}
+
+                  {selectedVendorForDetail.socialMedia ? (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        const igHandle = selectedVendorForDetail.socialMedia!.replace('@', '');
+                        Linking.openURL(`https://instagram.com/${igHandle}`).catch(() => {});
+                      }}
+                      style={[styles.contactActionBtn, { backgroundColor: '#E1306C' }]}
+                    >
+                      <Ionicons name="logo-instagram" size={16} color="#FFF" />
+                      <Text style={styles.contactActionText}>Instagram</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+
+                {/* 2. Contract & Payment Status Tracker */}
+                {(() => {
+                  const vendorTxs = transactions.filter(
+                    (tx) => tx.vendorName?.toLowerCase() === selectedVendorForDetail.name.toLowerCase()
+                  );
+                  const paid = vendorTxs
+                    .filter((tx) => tx.status === 'paid')
+                    .reduce((sum, tx) => sum + tx.amount, 0);
+                  const remaining = Math.max(0, selectedVendorForDetail.contractValue - paid);
+                  const pct =
+                    selectedVendorForDetail.contractValue > 0
+                      ? Math.min(100, Math.round((paid / selectedVendorForDetail.contractValue) * 100))
+                      : 0;
+
+                  return (
+                    <View style={styles.detailCardBox}>
+                      <View style={styles.rowBetween}>
+                        <Text style={styles.detailCardLabel}>Status Kontrak & Pembayaran</Text>
+                        <Badge
+                          label={
+                            pct === 100
+                              ? 'Lunas 100%'
+                              : selectedVendorForDetail.status === 'booked'
+                              ? 'Deal Kontrak'
+                              : 'Tahap Penjajakan'
+                          }
+                          variant={pct === 100 ? 'success' : 'accent'}
+                        />
+                      </View>
+
+                      <View style={[styles.rowBetween, { marginTop: 12 }]}>
+                        <View>
+                          <Text style={styles.subLabel}>Total Kontrak</Text>
+                          <Text style={styles.detailValuePrimary}>
+                            Rp {selectedVendorForDetail.contractValue.toLocaleString('id-ID')}
+                          </Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={styles.subLabel}>Sisa Tagihan</Text>
+                          <Text
+                            style={[
+                              styles.detailValuePrimary,
+                              { color: remaining > 0 ? colors.warning : colors.success },
+                            ]}
+                          >
+                            Rp {remaining.toLocaleString('id-ID')}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <ProgressBar progress={pct} height={8} style={{ marginVertical: 12 }} />
+
+                      <Text style={styles.subLabel}>
+                        Realisasi Pembayaran: Rp {paid.toLocaleString('id-ID')} ({pct}% lunas)
+                      </Text>
+
+                      {/* Riwayat termin transaksi vendor ini */}
+                      {vendorTxs.length > 0 ? (
+                        <View style={styles.vendorTxList}>
+                          <Text style={[styles.subLabel, { fontWeight: '700', marginBottom: 6 }]}>
+                            Riwayat Pembayaran Termin:
+                          </Text>
+                          {vendorTxs.map((t) => (
+                            <View key={t.id} style={styles.vendorTxRow}>
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.vendorTxTitle}>{t.notes}</Text>
+                                <Text style={styles.subLabel}>{t.date}</Text>
+                              </View>
+                              <View style={{ alignItems: 'flex-end' }}>
+                                <Text style={styles.vendorTxAmount}>
+                                  Rp {t.amount.toLocaleString('id-ID')}
+                                </Text>
+                                <Badge
+                                  label={t.status === 'paid' ? 'Lunas' : 'Pending'}
+                                  variant={t.status === 'paid' ? 'success' : 'neutral'}
+                                />
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      ) : (
+                        <Text style={[styles.subLabel, { fontStyle: 'italic', marginTop: 8 }]}>
+                          Belum ada pembayaran yang dicatat untuk vendor ini.
+                        </Text>
+                      )}
+                    </View>
+                  );
+                })()}
+
+                {/* 3. Jadwal Meeting, Fitting & Agenda */}
+                <View style={styles.detailCardBox}>
+                  <View style={styles.rowBetween}>
+                    <Text style={styles.detailCardLabel}>Jadwal Meeting & Fitting</Text>
+                    <TouchableOpacity
+                      onPress={() => setShowAddScheduleRow((v) => !v)}
+                      style={styles.addScheduleLink}
+                    >
+                      <Ionicons name="add-circle-outline" size={16} color={colors.accent} />
+                      <Text style={styles.addScheduleLinkText}>Tambah Jadwal</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Inline Form Tambah Jadwal */}
+                  {showAddScheduleRow ? (
+                    <View style={styles.inlineAddScheduleBox}>
+                      <TextInput
+                        placeholder="Nama agenda (misal: Fitting Perdana / Food Tasting)"
+                        placeholderTextColor={colors.textMuted}
+                        value={newScheduleTitle}
+                        onChangeText={setNewScheduleTitle}
+                        style={styles.textInput}
+                      />
+                      <TextInput
+                        placeholder="Tanggal & Jam (misal: 25 Sep 2027, 14:00)"
+                        placeholderTextColor={colors.textMuted}
+                        value={newScheduleDate}
+                        onChangeText={setNewScheduleDate}
+                        style={styles.textInput}
+                      />
+                      <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end' }}>
+                        <TouchableOpacity
+                          onPress={() => setShowAddScheduleRow(false)}
+                          style={[styles.contactActionBtn, { backgroundColor: colors.border }]}
+                        >
+                          <Text style={[styles.contactActionText, { color: colors.textSecondary }]}>
+                            Batal
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={handleAddSchedule}
+                          style={[styles.contactActionBtn, { backgroundColor: colors.accent }]}
+                        >
+                          <Text style={styles.contactActionText}>Simpan Jadwal</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {/* List of Schedules */}
+                  {(selectedVendorForDetail.schedules || []).length > 0 ? (
+                    <View style={{ marginTop: 10 }}>
+                      {(selectedVendorForDetail.schedules || []).map((sc) => (
+                        <View key={sc.id} style={styles.scheduleItemRow}>
+                          <TouchableOpacity
+                            onPress={() => handleToggleSchedule(sc.id)}
+                            style={[
+                              styles.scheduleCheckSquare,
+                              sc.completed && styles.scheduleCheckSquareChecked,
+                            ]}
+                          >
+                            {sc.completed ? (
+                              <Ionicons name="checkmark" size={12} color="#FFF" />
+                            ) : null}
+                          </TouchableOpacity>
+                          <View style={{ flex: 1 }}>
+                            <Text
+                              style={[
+                                styles.scheduleItemTitle,
+                                sc.completed && styles.scheduleItemCompleted,
+                              ]}
+                            >
+                              {sc.title}
+                            </Text>
+                            <Text style={styles.scheduleItemDate}>{sc.date}</Text>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => handleDeleteSchedule(sc.id)}
+                            style={{ padding: 4 }}
+                          >
+                            <Ionicons name="close" size={16} color={colors.textMuted} />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text style={[styles.subLabel, { fontStyle: 'italic', marginTop: 8 }]}>
+                      Belum ada jadwal meeting/fitting yang diagendakan.
+                    </Text>
+                  )}
+                </View>
+
+                {/* 4. Catatan Kesepakatan & Klausul Penting */}
+                <View style={styles.detailCardBox}>
+                  <Text style={styles.detailCardLabel}>Catatan Kesepakatan & Klausul</Text>
+                  <Text style={styles.vendorNotesBody}>
+                    {selectedVendorForDetail.notes ||
+                      'Belum ada catatan kesepakatan tertulis. Tekan Edit untuk menambahkan klausul atau bonus vendor.'}
+                  </Text>
+                </View>
+              </ScrollView>
+            </View>
+          ) : null}
         </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
@@ -786,5 +1243,195 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: colors.danger,
+  },
+  // Dedicated Vendor Sheet Styles
+  vendorNextScheduleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    backgroundColor: `${colors.accent}12`,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  vendorNextScheduleText: {
+    fontSize: 11,
+    color: colors.accent,
+    fontWeight: '600',
+  },
+  vendorSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingBottom: 14,
+    marginBottom: 16,
+  },
+  vendorSheetCategory: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.accent,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  vendorSheetTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    letterSpacing: -0.4,
+    marginTop: 2,
+  },
+  vendorSheetPic: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  vendorEditIconBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  vendorEditIconText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.accent,
+  },
+  detailSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 10,
+    marginTop: 4,
+  },
+  contactRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  contactActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+  },
+  contactActionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFF',
+  },
+  detailCardBox: {
+    backgroundColor: colors.bg,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    marginBottom: 14,
+  },
+  detailCardLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  detailValuePrimary: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginTop: 2,
+    fontVariant: ['tabular-nums'],
+  },
+  vendorTxList: {
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 10,
+  },
+  vendorTxRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  vendorTxTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  vendorTxAmount: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    fontVariant: ['tabular-nums'],
+    marginBottom: 2,
+  },
+  addScheduleLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  addScheduleLinkText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.accent,
+  },
+  inlineAddScheduleBox: {
+    backgroundColor: colors.cardBg,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 10,
+    marginTop: 10,
+    gap: 8,
+  },
+  scheduleItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  scheduleCheckSquare: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: colors.borderDark,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scheduleCheckSquareChecked: {
+    backgroundColor: colors.success,
+    borderColor: colors.success,
+  },
+  scheduleItemTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  scheduleItemCompleted: {
+    textDecorationLine: 'line-through',
+    color: colors.textMuted,
+  },
+  scheduleItemDate: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 1,
+  },
+  vendorNotesBody: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 19,
+    marginTop: 8,
   },
 });

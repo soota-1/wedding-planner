@@ -41,6 +41,13 @@ export interface CategoryItem {
   committed: number;
 }
 
+export interface VendorSchedule {
+  id: string;
+  title: string; // e.g. "Fitting Perdana", "Food Tasting", "Technical Meeting"
+  date: string; // e.g. "15 Jun 2027" or "14:00"
+  completed?: boolean;
+}
+
 export interface VendorItem {
   id: string;
   name: string;
@@ -48,6 +55,11 @@ export interface VendorItem {
   contractValue: number;
   status: 'researching' | 'shortlisted' | 'booked' | 'completed';
   contactPerson: string;
+  phone?: string;
+  email?: string;
+  socialMedia?: string;
+  notes?: string;
+  schedules?: VendorSchedule[];
 }
 
 export interface TransactionItem {
@@ -133,10 +145,68 @@ const initialCategories: CategoryItem[] = [
 ];
 
 const initialVendors: VendorItem[] = [
-  { id: 'v1', name: 'Gedung Paroki St. Perawan Maria', category: 'Venue', contractValue: 50000000, status: 'booked', contactPerson: 'Ibu Marta' },
-  { id: 'v2', name: 'Katering Selera Nusantara', category: 'Katering', contractValue: 80000000, status: 'booked', contactPerson: 'Pak Hendra' },
-  { id: 'v3', name: 'Atelier Wedding Photography', category: 'Dokumentasi', contractValue: 28000000, status: 'booked', contactPerson: 'David' },
-  { id: 'v4', name: 'Sanggar Rias & Gaun Pengantin', category: 'Busana', contractValue: 15000000, status: 'shortlisted', contactPerson: 'Cindy' },
+  {
+    id: 'v1',
+    name: 'Gedung Paroki St. Perawan Maria',
+    category: 'Venue',
+    contractValue: 50000000,
+    status: 'booked',
+    contactPerson: 'Ibu Marta',
+    phone: '081234567890',
+    email: 'sekretariat@parokimaria.org',
+    socialMedia: '@parokimariamedan',
+    notes: 'Kapasitas 1000 undangan. Bebas biaya kebersihan dan genset standar.',
+    schedules: [
+      { id: 'vs1', title: 'Technical Meeting Panitia & WO', date: '10 Sep 2027', completed: false },
+      { id: 'vs2', title: 'Gladi Bersih Tata Lampu & AC', date: '05 Okt 2027', completed: false },
+    ],
+  },
+  {
+    id: 'v2',
+    name: 'Katering Selera Nusantara',
+    category: 'Katering',
+    contractValue: 80000000,
+    status: 'booked',
+    contactPerson: 'Pak Hendra',
+    phone: '081398765432',
+    email: 'hendra@seleranusantara.com',
+    socialMedia: '@seleranusantara_catering',
+    notes: 'Paket Buffet 800 porsi + Bonus 2 pondokan (Es Doger & Sate Ayam). Pelunasan H-14.',
+    schedules: [
+      { id: 'vs3', title: 'Food Tasting Final Bersama Keluarga', date: '15 Agu 2027', completed: true },
+    ],
+  },
+  {
+    id: 'v3',
+    name: 'Atelier Wedding Photography',
+    category: 'Dokumentasi',
+    contractValue: 28000000,
+    status: 'booked',
+    contactPerson: 'David',
+    phone: '081122334455',
+    email: 'david@atelierphoto.id',
+    socialMedia: '@atelierwedding',
+    notes: '2 Fotografer + 2 Videografer (termasuk drone 4K dan teaser same-day edit).',
+    schedules: [
+      { id: 'vs4', title: 'Meeting Brief Moodboard & Rundown Foto', date: '01 Sep 2027', completed: false },
+    ],
+  },
+  {
+    id: 'v4',
+    name: 'Sanggar Rias & Gaun Pengantin',
+    category: 'Busana',
+    contractValue: 15000000,
+    status: 'shortlisted',
+    contactPerson: 'Cindy',
+    phone: '087788990011',
+    email: 'cindy@sanggarias.co.id',
+    socialMedia: '@cindy_bridal',
+    notes: 'Gaun pengantin bridal white + Jas pengantin Octa + 2 Ibu pengantin.',
+    schedules: [
+      { id: 'vs5', title: 'Fitting Gaun Perdana Jenesia', date: '20 Jul 2027', completed: true },
+      { id: 'vs6', title: 'Final Fitting Gaun & Jas', date: '25 Sep 2027', completed: false },
+    ],
+  },
 ];
 
 const initialTransactions: TransactionItem[] = [

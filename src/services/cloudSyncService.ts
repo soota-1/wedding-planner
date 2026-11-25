@@ -147,14 +147,32 @@ export class CloudSyncService {
       committed: 0,
     }));
 
-    const mappedVendors: VendorItem[] = (vendorsRes.data || []).map((v: any) => ({
-      id: v.id,
-      name: v.name,
-      category: v.category || 'Lainnya',
-      contractValue: Number(v.contract_value) || 0,
-      status: v.status || 'researching',
-      contactPerson: v.contact_person || 'PIC',
-    }));
+    const mappedVendors: VendorItem[] = (vendorsRes.data || []).map((v: any) => {
+      let parsedSchedules: any[] = [];
+      if (v.notes && v.notes.includes('__SCHEDULES__=')) {
+        try {
+          const parts = v.notes.split('__SCHEDULES__=');
+          parsedSchedules = JSON.parse(parts[1] || '[]');
+        } catch {
+          parsedSchedules = [];
+        }
+      }
+      const cleanNotes = v.notes ? v.notes.split('__SCHEDULES__=')[0].trim() : '';
+
+      return {
+        id: v.id,
+        name: v.name,
+        category: v.category || 'Lainnya',
+        contractValue: Number(v.contract_value) || 0,
+        status: v.status || 'researching',
+        contactPerson: v.contact_person || 'PIC',
+        phone: v.phone || undefined,
+        email: v.email || undefined,
+        socialMedia: v.social_media || undefined,
+        notes: cleanNotes || undefined,
+        schedules: parsedSchedules.length > 0 ? parsedSchedules : undefined,
+      };
+    });
 
     const mappedTransactions: TransactionItem[] = (txRes.data || []).map((tx: any) => ({
       id: tx.id,
@@ -340,6 +358,10 @@ export class CloudSyncService {
   static async pushVendor(vendor: VendorItem): Promise<void> {
     const ctx = getActiveSyncContext();
     if (!ctx || !isValidUuid(vendor.id)) return;
+    const combinedNotes = vendor.schedules && vendor.schedules.length > 0
+      ? `${vendor.notes || ''}\n__SCHEDULES__=${JSON.stringify(vendor.schedules)}`.trim()
+      : vendor.notes || null;
+
     await supabase.from('vendors').upsert({
       id: vendor.id,
       workspace_id: ctx.workspaceId,
@@ -348,6 +370,10 @@ export class CloudSyncService {
       contract_value: vendor.contractValue,
       status: vendor.status,
       contact_person: vendor.contactPerson,
+      phone: vendor.phone || null,
+      email: vendor.email || null,
+      social_media: vendor.socialMedia || null,
+      notes: combinedNotes,
     });
   }
 
