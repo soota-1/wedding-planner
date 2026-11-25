@@ -44,6 +44,8 @@ jest.mock('react-native', () => {
       reactModule.createElement('Pressable', { onPress, style, ...props }, typeof children === 'function' ? children({ pressed: false }) : children),
     ScrollView: ({ children, style, ...props }: any) =>
       reactModule.createElement('ScrollView', { style, ...props }, children),
+    Image: ({ source, style, ...props }: any) =>
+      reactModule.createElement('Image', { source, style, ...props }),
     TextInput: ({ value, onChangeText, style, ...props }: any) =>
       reactModule.createElement('TextInput', { value, onChangeText, style, ...props }),
     Modal: ({ children, visible, ...props }: any) =>
@@ -59,6 +61,9 @@ jest.mock('react-native', () => {
       Value: AnimatedValue,
       View: ({ children, style, ...props }: any) =>
         reactModule.createElement('Animated.View', { style, ...props }, children),
+      ScrollView: ({ children, style, ...props }: any) =>
+        reactModule.createElement('Animated.ScrollView', { style, ...props }, children),
+      event: () => jest.fn(),
       timing: () => ({ start: (cb?: any) => cb && cb() }),
       spring: () => ({ start: (cb?: any) => cb && cb() }),
       parallel: () => ({ start: (cb?: any) => cb && cb() }),

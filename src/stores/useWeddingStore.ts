@@ -202,6 +202,8 @@ const initialDocuments: DocumentItem[] = [
 ];
 
 export interface WeddingState {
+  hasSeenOnboarding: boolean;
+  setHasSeenOnboarding: (seen: boolean) => void;
   profile: WeddingProfile;
   tasks: ChecklistItem[];
   categories: CategoryItem[];
@@ -264,6 +266,8 @@ export interface WeddingState {
 export const useWeddingStore = create<WeddingState>()(
   persist(
     (set) => ({
+      hasSeenOnboarding: false,
+      setHasSeenOnboarding: (seen) => set({ hasSeenOnboarding: seen }),
       profile: DEFAULT_PROFILE,
       tasks: initialTasks,
       categories: initialCategories,

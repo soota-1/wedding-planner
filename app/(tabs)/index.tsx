@@ -110,11 +110,12 @@ export default function DashboardScreen() {
     setIsSyncing(true);
     try {
       await AuthService.signOut();
-      setSyncMessage('Berhasil keluar dari akun cloud.');
     } catch {
       useAuthStore.getState().reset();
     } finally {
       setIsSyncing(false);
+      setSettingsVisible(false);
+      router.replace('/login');
     }
   };
 

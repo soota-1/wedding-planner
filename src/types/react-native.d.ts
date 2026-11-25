@@ -13,7 +13,10 @@ declare module 'react-native' {
   export const TouchableOpacity: any;
   export const Pressable: any;
   export const ScrollView: any;
+  export const Image: any;
   export const TextInput: any;
+  export type NativeSyntheticEvent<T> = { nativeEvent: T };
+  export type NativeScrollEvent = { contentOffset: { x: number; y: number } };
   export const Modal: any;
   export const KeyboardAvoidingView: any;
   export const StatusBar: any;
