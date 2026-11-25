@@ -115,6 +115,9 @@ export default function MoodboardScreen() {
   const detailItem = detailItemId
     ? moodboardItems.find((m) => m.id === detailItemId) ?? null
     : null;
+  const [fullScreenPhoto, setFullScreenPhoto] = useState<{ uri: string; title: string } | null>(
+    null
+  );
   const [isSharing, setIsSharing] = useState(false);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
 
@@ -520,7 +523,13 @@ export default function MoodboardScreen() {
                         }}
                       >
                         {item.imageUrl ? (
-                          <View style={styles.thumbWrap}>
+                          <TouchableOpacity
+                            activeOpacity={0.85}
+                            onPress={() =>
+                              setFullScreenPhoto({ uri: item.imageUrl!, title: item.title })
+                            }
+                            style={styles.thumbWrap}
+                          >
                             <Image source={{ uri: item.imageUrl }} style={styles.thumbImage} />
                             {item.isFinal ? (
                               <View style={styles.finalCornerBadge}>
@@ -528,7 +537,10 @@ export default function MoodboardScreen() {
                                 <Text style={styles.finalCornerText}>Final</Text>
                               </View>
                             ) : null}
-                          </View>
+                            <View style={styles.zoomCornerBadge}>
+                              <Ionicons name="expand-outline" size={12} color="#FFF" />
+                            </View>
+                          </TouchableOpacity>
                         ) : (
                           <View style={styles.linkPlaceholder}>
                             <Ionicons name="link-outline" size={26} color={colors.accent} />
@@ -804,7 +816,7 @@ export default function MoodboardScreen() {
 
       {/* Item Detail Modal */}
       <Modal
-        visible={!!detailItem}
+        visible={!!detailItem && !fullScreenPhoto}
         transparent
         animationType="slide"
         onRequestClose={() => setDetailItemId(null)}
@@ -832,7 +844,23 @@ export default function MoodboardScreen() {
 
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
                 {detailItem.imageUrl ? (
-                  <Image source={{ uri: detailItem.imageUrl }} style={styles.detailImage} />
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() =>
+                      setFullScreenPhoto({ uri: detailItem.imageUrl!, title: detailItem.title })
+                    }
+                    style={styles.detailImageWrap}
+                  >
+                    <Image
+                      source={{ uri: detailItem.imageUrl }}
+                      style={styles.detailImage}
+                      resizeMode="contain"
+                    />
+                    <View style={styles.detailZoomPill}>
+                      <Ionicons name="expand-outline" size={12} color="#FFF" />
+                      <Text style={styles.detailZoomText}>Lihat Penuh</Text>
+                    </View>
+                  </TouchableOpacity>
                 ) : null}
 
                 <Text style={styles.detailTitle}>{detailItem.title}</Text>
@@ -934,6 +962,51 @@ export default function MoodboardScreen() {
               </ScrollView>
             </View>
           ) : null}
+        </View>
+      </Modal>
+
+      {/* Full-Screen Photo Lightbox Modal (Dark Translucent Backdrop) */}
+      <Modal
+        visible={!!fullScreenPhoto}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFullScreenPhoto(null)}
+      >
+        <View style={styles.lightboxOverlay}>
+          <TouchableOpacity
+            style={styles.lightboxBackdropTap}
+            activeOpacity={1}
+            onPress={() => setFullScreenPhoto(null)}
+          />
+          <SafeAreaView style={styles.lightboxContent} edges={['top', 'bottom']}>
+            <View style={styles.lightboxHeader}>
+              <Text style={styles.lightboxTitle} numberOfLines={1}>
+                {fullScreenPhoto?.title || ''}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setFullScreenPhoto(null)}
+                activeOpacity={0.8}
+                style={styles.lightboxCloseBtn}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={22} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+
+            {fullScreenPhoto ? (
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => setFullScreenPhoto(null)}
+                style={styles.lightboxImageWrap}
+              >
+                <Image
+                  source={{ uri: fullScreenPhoto.uri }}
+                  style={styles.lightboxImage}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            ) : null}
+          </SafeAreaView>
         </View>
       </Modal>
     </SafeAreaView>
@@ -1110,6 +1183,17 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 999,
   },
+  zoomCornerBadge: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(17, 19, 24, 0.58)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   finalCornerText: { fontSize: 10, fontWeight: '700', color: '#FFF' },
   cardBody: { padding: 10 },
   cardTitle: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, lineHeight: 18 },
@@ -1238,12 +1322,34 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   saveBtnText: { fontSize: 14, fontWeight: '700', color: colors.textLight },
+  detailImageWrap: {
+    position: 'relative',
+    borderRadius: 14,
+    backgroundColor: colors.surfaceMuted,
+    overflow: 'hidden',
+    marginBottom: 14,
+  },
   detailImage: {
     width: '100%',
     height: 240,
-    borderRadius: 14,
     backgroundColor: colors.surfaceMuted,
-    marginBottom: 14,
+  },
+  detailZoomPill: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(17, 19, 24, 0.65)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  detailZoomText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#FFF',
   },
   detailTitle: { fontSize: 19, fontWeight: '700', color: colors.textPrimary },
   detailVendorText: { fontSize: 13, fontWeight: '600', color: colors.accent, marginTop: 4 },
@@ -1321,4 +1427,49 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
   },
   secondaryActionText: { fontSize: 12, fontWeight: '600', color: colors.textPrimary },
+  lightboxOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.86)',
+    justifyContent: 'center',
+  },
+  lightboxBackdropTap: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  lightboxContent: {
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  lightboxHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingTop: 8,
+  },
+  lightboxTitle: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFF',
+  },
+  lightboxCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lightboxImageWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  lightboxImage: {
+    width: '100%',
+    height: '100%',
+  },
 });

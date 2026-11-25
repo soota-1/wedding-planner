@@ -40,5 +40,7 @@ describe('MoodboardScreen (Task 6)', () => {
     expect(serialized).toContain('Pelaminan Putih Minimalis');
     expect(serialized).toContain('Ekspor Brief PDF');
     expect(serialized).toContain('Gedung Paroki St. Perawan Maria');
+    expect(serialized).toContain('expand-outline');
+    expect(serialized).toContain('rgba(0, 0, 0, 0.86)');
   });
 });
