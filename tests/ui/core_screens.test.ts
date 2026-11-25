@@ -9,6 +9,8 @@ describe('Core Tab Screens (Dashboard, Checklist, Budget)', () => {
       typeof init === 'function' ? init() : init,
       jest.fn(),
     ]) as any);
+    jest.spyOn(React, 'useRef').mockImplementation((init: any) => ({ current: init }));
+    jest.spyOn(React, 'useEffect').mockImplementation(jest.fn());
   });
 
   afterAll(() => {
@@ -18,10 +20,8 @@ describe('Core Tab Screens (Dashboard, Checklist, Budget)', () => {
   it('exports valid React components for all core screens', () => {
     expect(DashboardScreen).toBeDefined();
     expect(typeof DashboardScreen).toBe('function');
-
     expect(ChecklistScreen).toBeDefined();
     expect(typeof ChecklistScreen).toBe('function');
-
     expect(BudgetScreen).toBeDefined();
     expect(typeof BudgetScreen).toBe('function');
   });

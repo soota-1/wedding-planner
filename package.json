@@ -11,6 +11,7 @@
     "demo:ui": "jest tests/phase3_ui_demo.test.ts"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
     "@supabase/supabase-js": "^2.49.1",
     "@tanstack/react-query": "^5.67.1",
     "date-fns": "^4.1.0",

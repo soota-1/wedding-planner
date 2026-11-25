@@ -1,16 +1,34 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  LayoutAnimation,
+  Platform,
+  UIManager,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 import { Card } from '../../src/components/common/Card';
 import { Header } from '../../src/components/common/Header';
 import { Badge } from '../../src/components/common/Badge';
-import { SegmentedControl } from '../../src/components/common/SegmentedControl';
+import { ProgressBar } from '../../src/components/common/ProgressBar';
+import { FilterChipBar } from '../../src/components/common/FilterChipBar';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface ChecklistItem {
   id: string;
   title: string;
-  category: string;
+  category: 'canonical' | 'civil' | 'liturgy' | 'vendor';
   dueDate: string;
   offsetDays: number;
   priority: 'critical' | 'high' | 'medium' | 'low';
@@ -19,29 +37,51 @@ interface ChecklistItem {
 }
 
 const initialTasks: ChecklistItem[] = [
-  { id: '1', title: 'Pendaftaran Kursus Persiapan Perkawinan (KPP)', category: 'canonical', dueDate: '13 Apr 2027', offsetDays: -180, priority: 'critical', pic: 'both', completed: true },
-  { id: '2', title: 'Pengurusan Surat Baptis Terbaru di Paroki Asal', category: 'canonical', dueDate: '13 Mei 2027', offsetDays: -150, priority: 'high', pic: 'both', completed: false },
-  { id: '3', title: 'Penyelidikan Kanonik dengan Pastor Paroki', category: 'canonical', dueDate: '12 Jul 2027', offsetDays: -90, priority: 'critical', pic: 'both', completed: false },
-  { id: '4', title: 'Penyiapan Berkas Disdukcapil & Formulir N1-N4', category: 'civil', dueDate: '11 Agu 2027', offsetDays: -60, priority: 'high', pic: 'both', completed: false },
+  { id: '1', title: 'Kursus Persiapan Perkawinan (KPP)', category: 'canonical', dueDate: '13 Apr 2027', offsetDays: -180, priority: 'critical', pic: 'both', completed: true },
+  { id: '2', title: 'Pengurusan Surat Baptis Terbaru', category: 'canonical', dueDate: '13 Mei 2027', offsetDays: -150, priority: 'high', pic: 'both', completed: false },
+  { id: '3', title: 'Penyelidikan Kanonik Pastor Paroki', category: 'canonical', dueDate: '12 Jul 2027', offsetDays: -90, priority: 'critical', pic: 'both', completed: false },
+  { id: '4', title: 'Berkas Disdukcapil & Formulir N1-N4', category: 'civil', dueDate: '11 Agu 2027', offsetDays: -60, priority: 'high', pic: 'both', completed: false },
   { id: '5', title: 'Penentuan Saksi Nikah Resmi Gereja', category: 'canonical', dueDate: '11 Agu 2027', offsetDays: -60, priority: 'medium', pic: 'both', completed: false },
-  { id: '6', title: 'Penyusunan Teks Liturgi & Buku Panduan Misa', category: 'liturgy', dueDate: '10 Sep 2027', offsetDays: -30, priority: 'medium', pic: 'groom', completed: false },
-  { id: '7', title: 'Technical Meeting & Gladi Bersih Gereja', category: 'liturgy', dueDate: '05 Okt 2027', offsetDays: -5, priority: 'high', pic: 'both', completed: false },
-  { id: '8', title: 'Sakramen Tobat / Rekonsiliasi Calon Mempelai', category: 'canonical', dueDate: '08 Okt 2027', offsetDays: -2, priority: 'critical', pic: 'both', completed: false },
-  { id: '9', title: 'Finalisasi Porsi Katering Resepsi & Rundown', category: 'vendor', dueDate: '26 Sep 2027', offsetDays: -14, priority: 'high', pic: 'bride', completed: false },
+  { id: '6', title: 'Teks Liturgi & Buku Panduan Misa', category: 'liturgy', dueDate: '10 Sep 2027', offsetDays: -30, priority: 'medium', pic: 'groom', completed: false },
+  { id: '7', title: 'Finalisasi Porsi Katering & Rundown', category: 'vendor', dueDate: '26 Sep 2027', offsetDays: -14, priority: 'high', pic: 'bride', completed: false },
+  { id: '8', title: 'Gladi Bersih Liturgi Gereja', category: 'liturgy', dueDate: '05 Okt 2027', offsetDays: -5, priority: 'high', pic: 'both', completed: false },
+  { id: '9', title: 'Sakramen Tobat Calon Mempelai', category: 'canonical', dueDate: '08 Okt 2027', offsetDays: -2, priority: 'critical', pic: 'both', completed: false },
 ];
 
-const categoryLabels = ['Semua', 'Kanonik & KPP', 'Sipil Disdukcapil', 'Liturgi', 'Vendor'];
+const categoryLabels = ['Semua', 'Kanonik & KPP', 'Sipil', 'Liturgi', 'Vendor'];
 const categoryKeys = ['all', 'canonical', 'civil', 'liturgy', 'vendor'];
 
 export default function ChecklistScreen() {
   const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [tasks, setTasks] = useState<ChecklistItem[]>(initialTasks);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
 
   const toggleTask = (id: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setTasks((prev) =>
       prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
     );
+  };
+
+  const handleAddTask = () => {
+    const trimmed = newTaskTitle.trim();
+    if (!trimmed) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const created: ChecklistItem = {
+      id: Date.now().toString(),
+      title: trimmed,
+      category: 'canonical',
+      dueDate: 'Segera',
+      offsetDays: -30,
+      priority: 'medium',
+      pic: 'both',
+      completed: false,
+    };
+    setTasks((prev) => [created, ...prev]);
+    setNewTaskTitle('');
+    setModalVisible(false);
   };
 
   const activeCategoryKey = categoryKeys[selectedCategoryIndex];
@@ -52,213 +92,295 @@ export default function ChecklistScreen() {
   });
 
   const completedCount = tasks.filter((t) => t.completed).length;
+  const progressRatio = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Header
-        title="Checklist Persiapan"
-        subtitle={`${completedCount} dari ${tasks.length} langkah pernikahan telah selesai`}
-        style={styles.header}
-      />
-
-      {/* Search Input */}
-      <View style={styles.searchContainer}>
-        <TextInput
-          placeholder="Cari tugas persiapan..."
-          placeholderTextColor={colors.textSecondary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          style={styles.searchInput}
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <Header
+          kicker="Persiapan Nikah"
+          title="Checklist"
+          subtitle={`${completedCount} dari ${tasks.length} langkah selesai`}
+          rightElement={
+            <TouchableOpacity
+              onPress={() => setModalVisible(true)}
+              activeOpacity={0.8}
+              style={styles.addButton}
+            >
+              <Ionicons name="add" size={18} color={colors.textLight} />
+              <Text style={styles.addButtonText}>Tugas</Text>
+            </TouchableOpacity>
+          }
         />
-      </View>
 
-      {/* Category Pills */}
-      <SegmentedControl
-        options={categoryLabels}
-        selectedIndex={selectedCategoryIndex}
-        onChange={setSelectedCategoryIndex}
-      />
+        {/* Live Progress */}
+        <View style={styles.progressWrapper}>
+          <ProgressBar progress={progressRatio} height={6} />
+        </View>
 
-      {/* Task List Cards */}
-      {filteredTasks.length === 0 ? (
-        <Card style={styles.emptyCard}>
-          <Text style={styles.emptyText}>Tidak ada tugas dalam kategori ini.</Text>
-        </Card>
-      ) : (
-        filteredTasks.map((t) => (
-          <Card
-            key={t.id}
-            variant="default"
-            style={[styles.taskCard, t.completed && styles.taskCardCompleted]}
-            onPress={() => toggleTask(t.id)}
-          >
-            <View style={styles.cardHeaderRow}>
-              {/* Checkbox Indicator */}
-              <View
-                style={[styles.checkbox, t.completed && styles.checkboxChecked]}
-              >
-                {t.completed ? <Text style={styles.checkIcon}>✓</Text> : null}
-              </View>
+        {/* Minimalist Search Input */}
+        <View style={styles.searchContainer}>
+          <Ionicons name="search-outline" size={16} color={colors.textMuted} />
+          <TextInput
+            placeholder="Cari tugas kanonik, sipil, atau vendor..."
+            placeholderTextColor={colors.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            style={styles.searchInput}
+          />
+          {searchQuery.length > 0 ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
 
-              <View style={styles.taskTextContainer}>
-                <Text
-                  style={[
-                    styles.taskTitle,
-                    t.completed && styles.taskTitleCompleted,
-                  ]}
-                >
-                  {t.title}
-                </Text>
-                <Text style={styles.taskDueInfo}>
-                  Jatuh tempo: {t.dueDate} (H{t.offsetDays})
-                </Text>
-              </View>
+        {/* Scrollable Category Pills */}
+        <FilterChipBar
+          options={categoryLabels}
+          selectedIndex={selectedCategoryIndex}
+          onChange={setSelectedCategoryIndex}
+        />
 
-              <Badge
-                label={t.priority.toUpperCase()}
-                variant={
-                  t.priority === 'critical'
-                    ? 'danger'
-                    : t.priority === 'high'
-                    ? 'warning'
-                    : 'neutral'
-                }
-              />
-            </View>
-
-            <View style={styles.cardFooterRow}>
-              <View style={styles.picContainer}>
-                <Text style={styles.picLabel}>PIC:</Text>
-                <Badge
-                  label={
-                    t.pic === 'groom'
-                      ? '🤵 Octa'
-                      : t.pic === 'bride'
-                      ? '👰 Jenesia'
-                      : '👫 Berdua'
-                  }
-                  variant="accent"
-                  size="sm"
-                />
-              </View>
-              <Text style={styles.statusIndicator}>
-                {t.completed ? '✅ Selesai' : '⏳ Belum Selesai'}
-              </Text>
-            </View>
+        {/* Clean Single List Card */}
+        {filteredTasks.length === 0 ? (
+          <Card style={styles.emptyCard}>
+            <Ionicons name="checkmark-done-outline" size={28} color={colors.textMuted} />
+            <Text style={styles.emptyText}>Tidak ada tugas dalam kategori ini.</Text>
           </Card>
-        ))
-      )}
-    </ScrollView>
+        ) : (
+          <Card style={styles.listCard}>
+            {filteredTasks.map((t, index) => (
+              <TouchableOpacity
+                key={t.id}
+                activeOpacity={0.7}
+                onPress={() => toggleTask(t.id)}
+                style={[
+                  styles.taskRow,
+                  index === filteredTasks.length - 1 && styles.taskRowLast,
+                ]}
+              >
+                <View style={[styles.checkbox, t.completed && styles.checkboxChecked]}>
+                  {t.completed ? (
+                    <Ionicons name="checkmark" size={14} color={colors.textLight} />
+                  ) : null}
+                </View>
+
+                <View style={styles.taskBody}>
+                  <Text
+                    style={[styles.taskTitle, t.completed && styles.taskTitleCompleted]}
+                    numberOfLines={2}
+                  >
+                    {t.title}
+                  </Text>
+                  <Text style={styles.taskMeta} numberOfLines={1}>
+                    {t.dueDate} • H{t.offsetDays} •{' '}
+                    {t.pic === 'groom' ? 'Octa' : t.pic === 'bride' ? 'Jenesia' : 'Berdua'}
+                  </Text>
+                </View>
+
+                <View style={styles.taskBadgeCol}>
+                  {t.priority === 'critical' ? (
+                    <Badge label="Kritis" variant="danger" />
+                  ) : t.priority === 'high' ? (
+                    <Badge label="Penting" variant="warning" />
+                  ) : null}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </Card>
+        )}
+      </ScrollView>
+
+      {/* Bottom-Sheet Modal Tambah Tugas */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Tambah Tugas Baru</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              placeholder="Misal: Fitting jas pengantin Octa"
+              placeholderTextColor={colors.textMuted}
+              value={newTaskTitle}
+              onChangeText={setNewTaskTitle}
+              style={styles.modalInput}
+              autoFocus
+            />
+            <TouchableOpacity
+              onPress={handleAddTask}
+              activeOpacity={0.85}
+              style={styles.modalSaveBtn}
+            >
+              <Text style={styles.modalSaveText}>Simpan ke Checklist</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.bg,
   },
   content: {
-    padding: spacing.md,
-    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xl,
   },
-  header: {
-    paddingHorizontal: 0,
-    marginBottom: spacing.xs,
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.accent,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: spacing.borderRadiusPill,
+    gap: 4,
+  },
+  addButtonText: {
+    color: colors.textLight,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  progressWrapper: {
+    marginBottom: spacing.md,
   },
   searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: colors.cardBg,
     borderColor: colors.border,
     borderWidth: 1,
-    borderRadius: spacing.borderRadiusPill,
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.sm,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginBottom: spacing.md,
+    gap: 8,
   },
   searchInput: {
-    height: 42,
+    flex: 1,
+    height: 40,
     fontSize: 13,
     color: colors.textPrimary,
   },
-  taskCard: {
-    padding: spacing.md,
-    marginBottom: spacing.sm,
+  listCard: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
   },
-  taskCardCompleted: {
-    opacity: 0.7,
-    backgroundColor: colors.neutral,
-  },
-  cardHeaderRow: {
+  taskRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  taskRowLast: {
+    borderBottomWidth: 0,
   },
   checkbox: {
     width: 22,
     height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
+    borderRadius: 11,
+    borderWidth: 1.5,
     borderColor: colors.borderDark,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.sm,
-    marginTop: 2,
+    marginRight: 12,
   },
   checkboxChecked: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,
   },
-  checkIcon: {
-    color: colors.textLight,
-    fontWeight: '800',
-    fontSize: 12,
-  },
-  taskTextContainer: {
+  taskBody: {
     flex: 1,
-    marginRight: spacing.sm,
+    paddingRight: 8,
   },
   taskTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.textPrimary,
-    lineHeight: 20,
+    lineHeight: 19,
   },
   taskTitleCompleted: {
     textDecorationLine: 'line-through',
+    color: colors.textMuted,
+  },
+  taskMeta: {
+    fontSize: 12,
     color: colors.textSecondary,
+    marginTop: 2,
   },
-  taskDueInfo: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginTop: 3,
-  },
-  cardFooterRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing.sm,
-    paddingTop: spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  picContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  picLabel: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  statusIndicator: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    fontWeight: '500',
+  taskBadgeCol: {
+    alignItems: 'flex-end',
   },
   emptyCard: {
-    padding: spacing.lg,
+    padding: spacing.xl,
     alignItems: 'center',
+    gap: 8,
   },
   emptyText: {
     fontSize: 13,
     color: colors.textSecondary,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(17, 19, 24, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: colors.cardBg,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: spacing.lg,
+    paddingBottom: 36,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: colors.borderDark,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  modalSaveBtn: {
+    backgroundColor: colors.accent,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  modalSaveText: {
+    color: colors.textLight,
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

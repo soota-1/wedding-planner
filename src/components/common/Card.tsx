@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, StyleSheet, StyleProp, ViewStyle, TouchableOpacity } from 'react-native';
+import React, { useRef } from 'react';
+import { Animated, Pressable, View, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 
@@ -11,6 +11,8 @@ export interface CardProps {
 }
 
 export function Card({ children, style, variant = 'default', onPress }: CardProps) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
   const containerStyle = [
     styles.card,
     variant === 'elevated' && styles.elevated,
@@ -20,10 +22,29 @@ export function Card({ children, style, variant = 'default', onPress }: CardProp
   ];
 
   if (onPress) {
+    const handlePressIn = () => {
+      Animated.spring(scaleAnim, {
+        toValue: 0.985,
+        useNativeDriver: true,
+        speed: 40,
+        bounciness: 4,
+      }).start();
+    };
+    const handlePressOut = () => {
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        speed: 40,
+        bounciness: 6,
+      }).start();
+    };
+
     return (
-      <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={containerStyle}>
-        {children}
-      </TouchableOpacity>
+      <Pressable onPress={onPress} onPressIn={handlePressIn} onPressOut={handlePressOut}>
+        <Animated.View style={[containerStyle, { transform: [{ scale: scaleAnim }] }]}>
+          {children}
+        </Animated.View>
+      </Pressable>
     );
   }
 
@@ -33,24 +54,24 @@ export function Card({ children, style, variant = 'default', onPress }: CardProp
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.cardBg,
-    borderRadius: spacing.borderRadius,
-    padding: spacing.md,
+    borderRadius: 16,
+    padding: 18,
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: spacing.md,
   },
   elevated: {
     shadowColor: colors.textPrimary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
     elevation: 2,
-    borderWidth: 0,
+    borderColor: colors.border,
   },
   outlined: {
     backgroundColor: 'transparent',
-    borderColor: colors.border,
-    borderWidth: 1.5,
+    borderColor: colors.borderDark,
+    borderWidth: 1,
   },
   highlight: {
     borderColor: colors.accent,

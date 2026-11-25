@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StyleProp, ViewStyle } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, View, Text, TouchableOpacity, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 
@@ -16,18 +16,53 @@ export function SegmentedControl({
   onChange,
   style,
 }: SegmentedControlProps) {
+  const [containerWidth, setContainerWidth] = useState(0);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  const segmentWidth = options.length > 0 && containerWidth > 0 ? (containerWidth - 6) / options.length : 0;
+
+  useEffect(() => {
+    if (segmentWidth > 0) {
+      Animated.spring(slideAnim, {
+        toValue: selectedIndex * segmentWidth,
+        useNativeDriver: true,
+        speed: 22,
+        bounciness: 6,
+      }).start();
+    }
+  }, [selectedIndex, segmentWidth]);
+
   return (
-    <View style={[styles.container, style]}>
+    <View
+      style={[styles.container, style]}
+      onLayout={(e: any) => setContainerWidth(e.nativeEvent.layout.width)}
+    >
+      {segmentWidth > 0 ? (
+        <Animated.View
+          style={[
+            styles.activePill,
+            {
+              width: segmentWidth,
+              transform: [{ translateX: slideAnim }],
+            },
+          ]}
+        />
+      ) : null}
+
       {options.map((option, index) => {
         const isSelected = selectedIndex === index;
         return (
           <TouchableOpacity
             key={option}
-            style={[styles.segment, isSelected && styles.segmentSelected]}
+            style={styles.segment}
             onPress={() => onChange(index)}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
-            <Text style={[styles.text, isSelected && styles.textSelected]}>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              style={[styles.text, isSelected && styles.textSelected]}
+            >
               {option}
             </Text>
           </TouchableOpacity>
@@ -40,25 +75,32 @@ export function SegmentedControl({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: colors.neutral,
+    backgroundColor: colors.surfaceMuted,
     borderRadius: spacing.borderRadiusPill,
     padding: 3,
     marginBottom: spacing.md,
+    position: 'relative',
+  },
+  activePill: {
+    position: 'absolute',
+    top: 3,
+    bottom: 3,
+    left: 3,
+    backgroundColor: colors.cardBg,
+    borderRadius: spacing.borderRadiusPill,
+    shadowColor: colors.textPrimary,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   segment: {
     flex: 1,
-    paddingVertical: 8,
-    borderRadius: spacing.borderRadiusPill,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  segmentSelected: {
-    backgroundColor: colors.cardBg,
-    shadowColor: colors.textPrimary,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    zIndex: 1,
   },
   text: {
     fontSize: 13,
@@ -66,7 +108,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   textSelected: {
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textPrimary,
   },
 });

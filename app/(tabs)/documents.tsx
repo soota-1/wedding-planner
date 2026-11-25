@@ -1,331 +1,312 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  LayoutAnimation,
+  Platform,
+  UIManager,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 import { Card } from '../../src/components/common/Card';
 import { Header } from '../../src/components/common/Header';
-import { StatCard } from '../../src/components/common/StatCard';
 import { Badge } from '../../src/components/common/Badge';
 import { ProgressBar } from '../../src/components/common/ProgressBar';
+import { FilterChipBar } from '../../src/components/common/FilterChipBar';
+import { FadeInView } from '../../src/components/common/FadeInView';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface DocumentItem {
   id: string;
   title: string;
   documentType: string;
-  category: 'church_canonical' | 'civil_disdukcapil' | 'other';
+  category: 'church_canonical' | 'civil_disdukcapil';
   owner: 'groom' | 'bride' | 'both';
   issueDate?: string;
   ageDays?: number;
-  status: 'verified' | 'pending' | 'expired' | 'rejected';
+  status: 'verified' | 'pending' | 'expired';
   notes?: string;
 }
 
 const initialDocuments: DocumentItem[] = [
   {
     id: 'd1',
-    title: 'Surat Baptis Octa (Terbaru)',
+    title: 'Surat Baptis Octa',
     documentType: 'Surat Baptis Katolik',
     category: 'church_canonical',
     owner: 'groom',
-    issueDate: '12 Juli 2027',
+    issueDate: '12 Jul 2027',
     ageDays: 90,
     status: 'verified',
-    notes: 'Diterbitkan Paroki St. Antonius. Umur 90 hari (<= 180 hari). Sah untuk kanonik.',
+    notes: 'Umur berkas 90 hari (memenuhi syarat maks. 180 hari).',
   },
   {
     id: 'd2',
-    title: 'Surat Baptis Jenesia (Perlu Pembaruan)',
+    title: 'Surat Baptis Jenesia',
     documentType: 'Surat Baptis Katolik',
     category: 'church_canonical',
     owner: 'bride',
-    issueDate: '10 Januari 2027',
+    issueDate: '10 Jan 2027',
     ageDays: 273,
     status: 'expired',
-    notes: 'Kedaluwarsa (>180 hari). Hubungi paroki tempat baptis asal untuk cetak ulang kutipan akta baptis.',
+    notes: 'Berusia 273 hari (>180 hari). Mohon cetak ulang di paroki asal.',
   },
   {
     id: 'd3',
-    title: 'Sertifikat Kursus Persiapan Perkawinan (KPP)',
-    documentType: 'Sertifikat Gereja',
+    title: 'Sertifikat KPP',
+    documentType: 'Kursus Perkawinan',
     category: 'church_canonical',
     owner: 'both',
     status: 'verified',
-    notes: 'Diterbitkan Komisi Kerasulan Keluarga Dekenat. Masa berlaku seumur hidup.',
+    notes: 'Komisi Kerasulan Keluarga Dekenat (berlaku seumur hidup).',
   },
   {
     id: 'd4',
-    title: 'Surat Pengantar Nikah Kelurahan (Formulir N1 - N4)',
+    title: 'Formulir N1 - N4 Kelurahan',
     documentType: 'Dokumen Sipil',
     category: 'civil_disdukcapil',
     owner: 'both',
     status: 'verified',
-    notes: 'Berkas lengkap dari RT/RW dan Kelurahan asal untuk pendaftaran Disdukcapil.',
+    notes: 'Surat pengantar RT/RW dan Kelurahan untuk Disdukcapil.',
   },
   {
     id: 'd5',
-    title: 'KTP & Kartu Keluarga Kedua Mempelai',
+    title: 'KTP & Kartu Keluarga',
     documentType: 'Identitas Kependudukan',
     category: 'civil_disdukcapil',
     owner: 'both',
     status: 'verified',
-    notes: 'Fotokopi legalisir & scan e-KTP dan KK Octa & Jenesia.',
+    notes: 'Scan legalisir dan arsip digital kedua mempelai.',
   },
 ];
 
+const docCategories = ['Semua', 'Gereja Katolik', 'Sipil Disdukcapil'];
+
 export default function DocumentsScreen() {
-  const totalDocs = initialDocuments.length;
-  const verifiedCount = initialDocuments.filter((d) => d.status === 'verified').length;
-  const expiredCount = initialDocuments.filter((d) => d.status === 'expired').length;
-  const complianceRate = Math.round((verifiedCount / totalDocs) * 100);
+  const [docs, setDocs] = useState<DocumentItem[]>(initialDocuments);
+  const [catIndex, setCatIndex] = useState(0);
+
+  const toggleDocStatus = (id: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setDocs((prev) =>
+      prev.map((d) => {
+        if (d.id !== id) return d;
+        const order: DocumentItem['status'][] = ['verified', 'pending', 'expired'];
+        const nextStatus = order[(order.indexOf(d.status) + 1) % order.length];
+        return { ...d, status: nextStatus };
+      })
+    );
+  };
+
+  const verifiedCount = docs.filter((d) => d.status === 'verified').length;
+  const expiredCount = docs.filter((d) => d.status === 'expired').length;
+  const complianceRate = docs.length > 0 ? Math.round((verifiedCount / docs.length) * 100) : 0;
+
+  const filteredDocs = docs.filter((d) => {
+    if (catIndex === 1) return d.category === 'church_canonical';
+    if (catIndex === 2) return d.category === 'civil_disdukcapil';
+    return true;
+  });
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Header
-        title="Dokumen Kanonik & Legal"
-        subtitle="Kepatuhan Prosedur Hukum Gereja Katolik & Sipil"
-        style={styles.header}
-      />
-
-      {/* 1. Indikator Kesiapan Dokumen */}
-      <Card style={styles.progressCard}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Tingkat Kesiapan Berkas</Text>
-          <Text style={styles.progressNumber}>{complianceRate}%</Text>
-        </View>
-        <ProgressBar progress={complianceRate} color={colors.accent} height={8} />
-        <Text style={styles.progressSubtext}>
-          {verifiedCount} dari {totalDocs} dokumen telah terverifikasi dan memenuhi syarat sah.
-        </Text>
-      </Card>
-
-      {/* 2. Banner Edukasi & Peringatan Kanonik Katolik */}
-      <Card style={styles.canonicalAlertCard}>
-        <View style={styles.alertHeaderRow}>
-          <Text style={styles.alertIcon}>📜</Text>
-          <View style={styles.alertTitleContainer}>
-            <Text style={styles.alertHeading}>Aturan Kanonik Surat Baptis Katolik</Text>
-            <Text style={styles.alertLaw}>Kitab Hukum Kanonik (KHK) Kanon 1066 - 1067</Text>
-          </View>
-        </View>
-        <Text style={styles.canonicalExplainer}>
-          Surat baptis untuk pernikahan Katolik{' '}
-          <Text style={styles.boldText}>wajib diterbitkan maksimal 6 bulan (180 hari)</Text>{' '}
-          sebelum tanggal Hari H (10 Oktober 2027). Tujuannya memastikan catatan status bebas (*status liber*)
-          tidak memiliki ikatan pernikahan sebelumnya.
-        </Text>
-        {expiredCount > 0 ? (
-          <View style={styles.warningActionBox}>
-            <Text style={styles.warningActionText}>
-              ⚠️ <Text style={styles.boldText}>Tindakan Diperlukan:</Text> Ditemukan {expiredCount} surat
-              baptis yang telah kedaluwarsa. Mohon segera meminta cetak ulang ke sekretariat paroki asal baptis.
-            </Text>
-          </View>
-        ) : null}
-      </Card>
-
-      {/* 3. StatCards Ringkasan Status */}
-      <View style={styles.statGrid}>
-        <StatCard
-          label="Dokumen Terverifikasi"
-          value={`${verifiedCount} Berkas`}
-          subtext="Siap untuk kanonik"
-          variant="success"
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <Header
+          kicker="Kanonik & Legal"
+          title="Dokumen"
+          subtitle={`${verifiedCount} dari ${docs.length} berkas siap • Ketuk untuk ubah status`}
         />
-        <StatCard
-          label="Dokumen Kedaluwarsa"
-          value={`${expiredCount} Berkas`}
-          subtext="Perlu pembaruan segera"
-          variant={expiredCount > 0 ? 'warning' : 'default'}
-        />
-      </View>
 
-      {/* 4. Daftar Dokumen & Status */}
-      <Card style={[styles.sectionCard, { marginTop: spacing.md }]}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Daftar Berkas Perkawinan</Text>
-          <Text style={styles.subtextCount}>{initialDocuments.length} Berkas</Text>
-        </View>
-
-        {initialDocuments.map((doc) => (
-          <View key={doc.id} style={styles.docItem}>
-            <View style={styles.docHeaderRow}>
-              <View style={styles.docTitleContainer}>
-                <Text style={styles.docTitle}>{doc.title}</Text>
-                <Text style={styles.docType}>
-                  {doc.documentType} • Milik:{' '}
-                  {doc.owner === 'groom'
-                    ? '🤵 Octa'
-                    : doc.owner === 'bride'
-                    ? '👰 Jenesia'
-                    : '👫 Kedua Mempelai'}
-                </Text>
-              </View>
-              <Badge
-                label={
-                  doc.status === 'verified'
-                    ? '✅ SAH / VERIFIED'
-                    : doc.status === 'expired'
-                    ? '⚠️ KEDALUWARSA'
-                    : 'MENUNGGU'
-                }
-                variant={
-                  doc.status === 'verified'
-                    ? 'success'
-                    : doc.status === 'expired'
-                    ? 'warning'
-                    : 'neutral'
-                }
-              />
+        {/* Compliance Hero */}
+        <FadeInView delay={30}>
+          <Card variant="elevated">
+            <View style={styles.rowBetween}>
+              <Text style={styles.cardTitle}>Kesiapan Berkas</Text>
+              <Text style={styles.percentValue}>{complianceRate}%</Text>
             </View>
+            <ProgressBar progress={complianceRate} height={7} style={{ marginVertical: 10 }} />
+            <Text style={styles.cardSub}>
+              {expiredCount > 0
+                ? `${expiredCount} dokumen kedaluwarsa perlu pembaruan sebelum kanonik.`
+                : 'Seluruh dokumen utama memenuhi syarat hukum kanonik & sipil.'}
+            </Text>
+          </Card>
+        </FadeInView>
 
-            {doc.issueDate ? (
-              <Text style={styles.issueDateText}>
-                📅 Terbit: {doc.issueDate} {doc.ageDays ? `(Umur berkas: ${doc.ageDays} hari)` : ''}
-              </Text>
-            ) : null}
+        {/* Minimalist Canon Rule Note */}
+        <FadeInView delay={90}>
+          <Card style={styles.canonCard}>
+            <View style={styles.canonHeader}>
+              <Ionicons name="shield-checkmark-outline" size={16} color={colors.accent} />
+              <Text style={styles.canonTitle}>Aturan Kanonik (KHK 1066–1067)</Text>
+            </View>
+            <Text style={styles.canonText}>
+              Surat Baptis wajib diterbitkan maksimal <Text style={styles.bold}>180 hari (6 bulan)</Text>{' '}
+              sebelum Hari H (10 Okt 2027) untuk memverifikasi status bebas nikah.
+            </Text>
+          </Card>
+        </FadeInView>
 
-            {doc.notes ? <Text style={styles.docNotes}>{doc.notes}</Text> : null}
-          </View>
-        ))}
-      </Card>
-    </ScrollView>
+        <FilterChipBar
+          options={docCategories}
+          selectedIndex={catIndex}
+          onChange={setCatIndex}
+        />
+
+        <FadeInView delay={150}>
+          <Card style={styles.listCard}>
+            {filteredDocs.map((doc, idx) => (
+              <TouchableOpacity
+                key={doc.id}
+                activeOpacity={0.7}
+                onPress={() => toggleDocStatus(doc.id)}
+                style={[styles.docRow, idx === filteredDocs.length - 1 && styles.rowLast]}
+              >
+                <View style={styles.docHeader}>
+                  <View style={styles.docTitleCol}>
+                    <Text style={styles.docTitle} numberOfLines={1}>
+                      {doc.title}
+                    </Text>
+                    <Text style={styles.docMeta}>
+                      {doc.documentType} •{' '}
+                      {doc.owner === 'groom' ? 'Octa' : doc.owner === 'bride' ? 'Jenesia' : 'Berdua'}
+                      {doc.issueDate ? ` • ${doc.issueDate}` : ''}
+                    </Text>
+                  </View>
+                  <Badge
+                    label={
+                      doc.status === 'verified'
+                        ? 'Sah'
+                        : doc.status === 'expired'
+                        ? 'Kedaluwarsa'
+                        : 'Pending'
+                    }
+                    variant={
+                      doc.status === 'verified'
+                        ? 'success'
+                        : doc.status === 'expired'
+                        ? 'warning'
+                        : 'neutral'
+                    }
+                  />
+                </View>
+                {doc.notes ? <Text style={styles.docNotes}>{doc.notes}</Text> : null}
+              </TouchableOpacity>
+            ))}
+          </Card>
+        </FadeInView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.bg,
   },
   content: {
-    padding: spacing.md,
-    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xl,
   },
-  header: {
-    paddingHorizontal: 0,
-    marginBottom: spacing.xs,
-  },
-  progressCard: {
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  sectionHeader: {
+  rowBetween: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
   },
-  sectionTitle: {
+  cardTitle: {
     fontSize: 15,
     fontWeight: '700',
     color: colors.textPrimary,
   },
-  progressNumber: {
+  percentValue: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.accent,
+    fontVariant: ['tabular-nums'],
   },
-  progressSubtext: {
+  cardSub: {
     fontSize: 12,
     color: colors.textSecondary,
-    marginTop: spacing.sm,
+    lineHeight: 17,
   },
-  canonicalAlertCard: {
-    padding: spacing.md,
-    backgroundColor: colors.accentLight,
-    borderColor: colors.accent,
-    marginBottom: spacing.md,
+  canonCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
-  alertHeaderRow: {
+  canonHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    gap: 6,
+    marginBottom: 4,
   },
-  alertIcon: {
-    fontSize: 22,
-    marginRight: spacing.sm,
-  },
-  alertTitleContainer: {
-    flex: 1,
-  },
-  alertHeading: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.accentDark,
-  },
-  alertLaw: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
-  canonicalExplainer: {
-    fontSize: 12,
-    color: colors.textPrimary,
-    lineHeight: 18,
-    marginTop: 4,
-  },
-  boldText: {
-    fontWeight: '700',
-  },
-  warningActionBox: {
-    backgroundColor: colors.cardBg,
-    borderColor: colors.warning,
-    borderWidth: 1,
-    borderRadius: spacing.borderRadiusSm,
-    padding: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  warningActionText: {
-    fontSize: 11,
-    color: colors.textPrimary,
-    lineHeight: 16,
-  },
-  statGrid: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  sectionCard: {
-    padding: spacing.md,
-  },
-  subtextCount: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  docItem: {
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  docHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  docTitleContainer: {
-    flex: 1,
-    marginRight: spacing.sm,
-  },
-  docTitle: {
+  canonTitle: {
     fontSize: 13,
     fontWeight: '700',
     color: colors.textPrimary,
   },
-  docType: {
-    fontSize: 11,
+  canonText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  bold: {
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  listCard: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+  },
+  docRow: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  rowLast: {
+    borderBottomWidth: 0,
+  },
+  docHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  docTitleCol: {
+    flex: 1,
+  },
+  docTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  docMeta: {
+    fontSize: 12,
     color: colors.textSecondary,
     marginTop: 2,
   },
-  issueDateText: {
-    fontSize: 11,
-    color: colors.accentDark,
-    fontWeight: '500',
-    marginTop: 4,
-  },
   docNotes: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginTop: 4,
-    lineHeight: 16,
-    fontStyle: 'italic',
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 6,
+    lineHeight: 17,
   },
 });

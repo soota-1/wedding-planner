@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle, TouchableOpacity } from 'react-native';
 import { colors } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
 
 export interface StatCardProps {
   label: string;
@@ -32,8 +31,12 @@ export function StatCard({
         style,
       ]}
     >
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label} numberOfLines={1}>
+        {label}
+      </Text>
       <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
         style={[
           styles.value,
           accentColor ? { color: accentColor } : null,
@@ -44,13 +47,17 @@ export function StatCard({
       >
         {value}
       </Text>
-      {subtext ? <Text style={styles.subtext}>{subtext}</Text> : null}
+      {subtext ? (
+        <Text style={styles.subtext} numberOfLines={1}>
+          {subtext}
+        </Text>
+      ) : null}
     </View>
   );
 
   if (onPress) {
     return (
-      <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={[{ flex: 1 }, style]}>
+      <TouchableOpacity activeOpacity={0.75} onPress={onPress} style={[{ flex: 1 }, style]}>
         {content}
       </TouchableOpacity>
     );
@@ -62,11 +69,10 @@ export function StatCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.cardBg,
-    borderRadius: spacing.borderRadius,
-    padding: spacing.md,
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1,
     borderColor: colors.border,
-    minWidth: 120,
     flex: 1,
   },
   highlightCard: {
@@ -85,18 +91,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
+    letterSpacing: 0.2,
+    marginBottom: 6,
   },
   value: {
-    fontSize: 20,
+    fontSize: 19,
     fontWeight: '700',
     color: colors.textPrimary,
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
+    fontVariant: ['tabular-nums'],
   },
   subtext: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.textSecondary,
     marginTop: 4,
   },

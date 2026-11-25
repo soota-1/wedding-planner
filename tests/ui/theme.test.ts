@@ -2,16 +2,16 @@ import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 
 describe('Design System Theme Tokens', () => {
-  it('defines required wedding theme color tokens', () => {
-    expect(colors.bg).toBe('#FDFBF7');
-    expect(colors.accent).toBe('#C57B57');
-    expect(colors.secondary).toBe('#D4AF37');
-    expect(colors.textPrimary).toBe('#1A2238');
+  it('defines refined minimalist editorial color tokens', () => {
+    expect(colors.bg).toBe('#F8F7F4');
+    expect(colors.accent).toBe('#9E5A47');
+    expect(colors.secondary).toBe('#B89242');
+    expect(colors.textPrimary).toBe('#111318');
     expect(colors.cardBg).toBe('#FFFFFF');
-    expect(colors.border).toBe('#EFECE6');
-    expect(colors.success).toBe('#2E7D32');
-    expect(colors.warning).toBe('#D97706');
-    expect(colors.danger).toBe('#DC2626');
+    expect(colors.border).toBe('#E9E6DF');
+    expect(colors.success).toBe('#236B48');
+    expect(colors.warning).toBe('#9A6012');
+    expect(colors.danger).toBe('#A83232');
   });
 
   it('defines standard spacing and border radius', () => {

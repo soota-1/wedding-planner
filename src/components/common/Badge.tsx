@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, StyleProp, ViewStyle, TextStyle } from 'react-native';
+import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 
@@ -28,7 +28,7 @@ export function Badge({ label, variant = 'neutral', size = 'sm', style }: BadgeP
       case 'secondary':
         return { bg: colors.secondaryLight, text: colors.secondary };
       default:
-        return { bg: colors.neutral, text: colors.textSecondary };
+        return { bg: colors.surfaceMuted, text: colors.textSecondary };
     }
   };
 
@@ -43,7 +43,10 @@ export function Badge({ label, variant = 'neutral', size = 'sm', style }: BadgeP
         style,
       ]}
     >
-      <Text style={[styles.text, { color: text }, size === 'md' && styles.textMd]}>
+      <Text
+        numberOfLines={1}
+        style={[styles.text, { color: text }, size === 'md' && styles.textMd]}
+      >
         {label}
       </Text>
     </View>
@@ -52,21 +55,22 @@ export function Badge({ label, variant = 'neutral', size = 'sm', style }: BadgeP
 
 const styles = StyleSheet.create({
   badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
     borderRadius: spacing.borderRadiusPill,
     alignSelf: 'flex-start',
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
   badgeMd: {
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 5,
   },
   text: {
     fontSize: 11,
     fontWeight: '600',
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   },
   textMd: {
     fontSize: 12,

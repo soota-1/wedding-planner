@@ -1,36 +1,37 @@
 export const colors = {
-  // Backgrounds
-  bg: '#FDFBF7', // Warm Ivory / Off-White
-  cardBg: '#FFFFFF', // Pure White for clean contrast
-  border: '#EFECE6', // Subtle warm border
-  borderDark: '#DDD8CE',
+  // Editorial Warm Minimalist Canvas
+  bg: '#F8F7F4', // Clean Warm Alabaster
+  cardBg: '#FFFFFF', // Crisp White Surface
+  surfaceMuted: '#F1EFEA', // Soft Warm Stone
+  border: '#E9E6DF', // Ultra-subtle hairline border
+  borderDark: '#D6D1C7',
 
-  // Wedding Brand Accents (Earthy & Romantic)
-  accent: '#C57B57', // Terracotta / Warm Rose Gold
-  accentLight: '#FBECE7', // Soft blush background tint
-  accentDark: '#9E5B3B',
+  // Restrained Wedding Brand Accents
+  accent: '#9E5A47', // Dusty Rosewood / Terracotta
+  accentLight: '#F6ECE9', // Soft Rose Tint
+  accentDark: '#783E2E',
 
   // Secondary Accents
-  secondary: '#D4AF37', // Champagne Gold
-  secondaryLight: '#FCF7E6',
+  secondary: '#B89242', // Brushed Champagne Gold
+  secondaryLight: '#FAF5E8',
 
-  // Typography
-  textPrimary: '#1A2238', // Deep Midnight Navy
-  textSecondary: '#6B7280', // Muted Charcoal
-  textMuted: '#9CA3AF',
+  // High-Contrast Typography
+  textPrimary: '#111318', // Rich Obsidian Ink
+  textSecondary: '#646873', // Refined Slate
+  textMuted: '#9A9EA8',
   textLight: '#FFFFFF',
 
-  // Semantic Status
-  success: '#2E7D32', // Emerald Green (Sah / Selesai)
-  successBg: '#E8F5E9',
-  warning: '#D97706', // Warm Amber (Peringatan / Kedaluwarsa / Over-budget)
-  warningBg: '#FEF3C7',
-  danger: '#DC2626', // Ruby Red (Kritis / Overdue)
-  dangerBg: '#FEE2E2',
-  info: '#2563EB', // Royal Blue
-  infoBg: '#EFF6FF',
-  neutral: '#F3F4F6',
-  neutralDark: '#E5E7EB',
+  // Restrained Semantic Status
+  success: '#236B48', // Deep Forest Emerald
+  successBg: '#ECF5F0',
+  warning: '#9A6012', // Muted Ochre Bronze
+  warningBg: '#FAF3E6',
+  danger: '#A83232', // Muted Crimson
+  dangerBg: '#FBECEC',
+  info: '#2B5B84', // Steel Blue
+  infoBg: '#EDF3F8',
+  neutral: '#F1EFEA',
+  neutralDark: '#E2DFD7',
 };
 
 export type ColorKey = keyof typeof colors;

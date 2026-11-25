@@ -8,6 +8,8 @@ describe('Data Tab Screens (Guests & Canonical Documents)', () => {
       typeof init === 'function' ? init() : init,
       jest.fn(),
     ]) as any);
+    jest.spyOn(React, 'useRef').mockImplementation((init: any) => ({ current: init }));
+    jest.spyOn(React, 'useEffect').mockImplementation(jest.fn());
   });
 
   afterAll(() => {
@@ -17,7 +19,6 @@ describe('Data Tab Screens (Guests & Canonical Documents)', () => {
   it('exports valid React components for guests and documents screens', () => {
     expect(GuestsScreen).toBeDefined();
     expect(typeof GuestsScreen).toBe('function');
-
     expect(DocumentsScreen).toBeDefined();
     expect(typeof DocumentsScreen).toBe('function');
   });
