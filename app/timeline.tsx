@@ -28,7 +28,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 interface TimelineEntry {
   id: string;
   sourceId: string;
-  kind: 'task' | 'payment';
+  kind: 'task' | 'payment' | 'appointment';
   title: string;
   subtitle: string;
   dateLabel: string;
@@ -39,7 +39,7 @@ interface TimelineEntry {
   amount?: number;
 }
 
-const filterOptions = ['Semua', 'Tugas Persiapan', 'Cicilan Vendor', 'Selesai'];
+const filterOptions = ['Semua', 'Tugas Persiapan', 'Jadwal Vendor', 'Cicilan Vendor', 'Selesai'];
 
 export default function TimelineScreen() {
   const router = useRouter();
@@ -47,9 +47,36 @@ export default function TimelineScreen() {
   const [reminderStatus, setReminderStatus] = useState<string | null>(null);
 
   const tasks = useWeddingStore((s) => s.tasks);
+  const vendors = useWeddingStore((s) => s.vendors);
   const transactions = useWeddingStore((s) => s.transactions);
   const weddingDate = useWeddingStore((s) => s.profile.weddingDate);
   const toggleTask = useWeddingStore((s) => s.toggleTask);
+
+  const baseWedding = new Date(weddingDate);
+  const safeWeddingMs = isNaN(baseWedding.getTime())
+    ? new Date('2027-10-10T00:00:00.000Z').getTime()
+    : baseWedding.getTime();
+
+  const vendorAppointments: TimelineEntry[] = vendors.flatMap((v) =>
+    (v.schedules || []).map((sc) => {
+      const parsedApt = sc.isoDateTime ? new Date(sc.isoDateTime) : new Date(sc.date);
+      const offsetFromWedding = !isNaN(parsedApt.getTime())
+        ? Math.round((parsedApt.getTime() - safeWeddingMs) / (24 * 60 * 60 * 1000))
+        : -30;
+      return {
+        id: `apt-${v.id}-${sc.id}`,
+        sourceId: sc.id,
+        kind: 'appointment' as const,
+        title: sc.title,
+        subtitle: `${v.name} • ${v.contactPerson}${sc.reminderEnabled ? ' • 🔔 Pengingat Aktif' : ''}`,
+        dateLabel: `${sc.date}${sc.time ? ` • ${sc.time} WIB` : ''}`,
+        sortWeight: offsetFromWedding,
+        isCompleted: !!sc.completed,
+        badgeLabel: sc.completed ? 'Selesai' : 'Fitting/Meeting',
+        badgeVariant: (sc.completed ? 'success' : 'warning') as TimelineEntry['badgeVariant'],
+      };
+    })
+  );
 
   // Build unified chronological timeline
   const entries: TimelineEntry[] = [
@@ -69,6 +96,7 @@ export default function TimelineScreen() {
         ? 'danger'
         : 'warning') as TimelineEntry['badgeVariant'],
     })),
+    ...vendorAppointments,
     ...transactions.map((tx, idx) => ({
       id: `tx-${tx.id}`,
       sourceId: tx.id,
@@ -86,8 +114,9 @@ export default function TimelineScreen() {
 
   const filteredEntries = entries.filter((item) => {
     if (filterIndex === 1) return item.kind === 'task' && !item.isCompleted;
-    if (filterIndex === 2) return item.kind === 'payment' && !item.isCompleted;
-    if (filterIndex === 3) return item.isCompleted;
+    if (filterIndex === 2) return item.kind === 'appointment' && !item.isCompleted;
+    if (filterIndex === 3) return item.kind === 'payment' && !item.isCompleted;
+    if (filterIndex === 4) return item.isCompleted;
     return true;
   });
 
@@ -105,9 +134,11 @@ export default function TimelineScreen() {
         id: e.sourceId,
         title: e.title,
         date: new Date(safeWedding.getTime() + e.sortWeight * 24 * 60 * 60 * 1000),
-        type: (e.kind === 'payment' ? 'payment_deadline' : 'task_deadline') as
-          | 'payment_deadline'
-          | 'task_deadline',
+        type: (e.kind === 'payment'
+          ? 'payment_deadline'
+          : e.kind === 'appointment'
+          ? 'appointment'
+          : 'task_deadline') as 'payment_deadline' | 'appointment' | 'task_deadline',
         amount: e.amount,
         isCompleted: e.isCompleted,
       }));

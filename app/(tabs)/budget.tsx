@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { format, subDays } from 'date-fns';
 import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 import { Card } from '../../src/components/common/Card';
@@ -25,11 +26,14 @@ import { Badge } from '../../src/components/common/Badge';
 import { ProgressBar } from '../../src/components/common/ProgressBar';
 import { SegmentedControl } from '../../src/components/common/SegmentedControl';
 import { FadeInView } from '../../src/components/common/FadeInView';
+import { CalendarPicker } from '../../src/components/common/CalendarPicker';
+import { NotificationService, formatReminderLeadTime } from '../../src/services/notificationService';
 import {
   useWeddingStore,
   CategoryItem,
   VendorItem,
   TransactionItem,
+  VendorSchedule,
 } from '../../src/stores/useWeddingStore';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -43,6 +47,12 @@ export default function BudgetScreen() {
   const categories = useWeddingStore((s) => s.categories);
   const vendors = useWeddingStore((s) => s.vendors);
   const transactions = useWeddingStore((s) => s.transactions);
+  const weddingDateIso = useWeddingStore((s) => s.profile.weddingDate);
+
+  const parsedWedding = new Date(weddingDateIso);
+  const safeWeddingDate = isNaN(parsedWedding.getTime())
+    ? new Date('2027-10-10T00:00:00.000Z')
+    : parsedWedding;
   const addCategory = useWeddingStore((s) => s.addCategory);
   const updateCategory = useWeddingStore((s) => s.updateCategory);
   const deleteCategory = useWeddingStore((s) => s.deleteCategory);
@@ -76,7 +86,17 @@ export default function BudgetScreen() {
   // Vendor Detail Sheet state
   const [selectedVendorForDetail, setSelectedVendorForDetail] = useState<VendorItem | null>(null);
   const [newScheduleTitle, setNewScheduleTitle] = useState('');
-  const [newScheduleDate, setNewScheduleDate] = useState('');
+  const [newScheduleSelectedDate, setNewScheduleSelectedDate] = useState<Date>(() =>
+    subDays(safeWeddingDate, 30)
+  );
+  const [newScheduleDate, setNewScheduleDate] = useState<string>(() =>
+    format(subDays(safeWeddingDate, 30), 'dd MMM yyyy')
+  );
+  const [newScheduleHour, setNewScheduleHour] = useState<number>(14);
+  const [newScheduleMinute, setNewScheduleMinute] = useState<number>(0);
+  const [showScheduleCalendar, setShowScheduleCalendar] = useState(false);
+  const [newScheduleReminderEnabled, setNewScheduleReminderEnabled] = useState(true);
+  const [newScheduleReminderMinutes, setNewScheduleReminderMinutes] = useState<number>(60);
   const [showAddScheduleRow, setShowAddScheduleRow] = useState(false);
 
   // Transaction form state
@@ -258,21 +278,46 @@ export default function BudgetScreen() {
     setSelectedVendorForDetail(updatedVendor);
   };
 
-  const handleAddSchedule = () => {
+  const handleScheduleDatePicked = (date: Date, _offsetDays: number, formattedLabel: string) => {
+    setNewScheduleSelectedDate(date);
+    setNewScheduleDate(formattedLabel);
+    setShowScheduleCalendar(false);
+  };
+
+  const handleAddSchedule = async () => {
     if (!selectedVendorForDetail || !newScheduleTitle.trim()) return;
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    const newEntry = {
+
+    const timeStr = `${String(newScheduleHour).padStart(2, '0')}:${String(newScheduleMinute).padStart(2, '0')}`;
+    const combinedDate = new Date(newScheduleSelectedDate);
+    combinedDate.setHours(newScheduleHour, newScheduleMinute, 0, 0);
+
+    const newEntry: VendorSchedule = {
       id: `vs_${Date.now()}`,
       title: newScheduleTitle.trim(),
-      date: newScheduleDate.trim() || 'Segera',
+      date: newScheduleDate || format(combinedDate, 'dd MMM yyyy'),
+      time: timeStr,
+      isoDateTime: combinedDate.toISOString(),
+      reminderEnabled: newScheduleReminderEnabled,
+      reminderMinutesBefore: newScheduleReminderEnabled ? newScheduleReminderMinutes : undefined,
       completed: false,
     };
+
     const nextList = [...(selectedVendorForDetail.schedules || []), newEntry];
     const updatedVendor = { ...selectedVendorForDetail, schedules: nextList };
     updateVendor(selectedVendorForDetail.id, { schedules: nextList });
     setSelectedVendorForDetail(updatedVendor);
+
+    if (newScheduleReminderEnabled) {
+      const res = await NotificationService.scheduleVendorReminder(
+        newEntry,
+        selectedVendorForDetail.name
+      );
+      Alert.alert('Jadwal & Pengingat Aktif', res.message);
+    }
+
     setNewScheduleTitle('');
-    setNewScheduleDate('');
+    setShowScheduleCalendar(false);
     setShowAddScheduleRow(false);
   };
 
@@ -479,8 +524,12 @@ export default function BudgetScreen() {
                         <View style={styles.vendorNextScheduleRow}>
                           <Ionicons name="time-outline" size={12} color={colors.accent} />
                           <Text style={styles.vendorNextScheduleText} numberOfLines={1}>
-                            Agenda: {nextSchedule.title} ({nextSchedule.date})
+                            Agenda: {nextSchedule.title} ({nextSchedule.date}
+                            {nextSchedule.time ? ` • ${nextSchedule.time}` : ''})
                           </Text>
+                          {nextSchedule.reminderEnabled ? (
+                            <Ionicons name="notifications-outline" size={12} color={colors.accent} />
+                          ) : null}
                         </View>
                       ) : null}
                     </TouchableOpacity>
@@ -908,26 +957,201 @@ export default function BudgetScreen() {
                     </TouchableOpacity>
                   </View>
 
-                  {/* Inline Form Tambah Jadwal */}
+                  {/* Inline Form Tambah Jadwal (Kalender + Jam + Pengingat) */}
                   {showAddScheduleRow ? (
                     <View style={styles.inlineAddScheduleBox}>
+                      <Text style={styles.scheduleFormLabel}>Nama Agenda</Text>
                       <TextInput
-                        placeholder="Nama agenda (misal: Fitting Perdana / Food Tasting)"
+                        placeholder="Misal: Fitting Perdana / Food Tasting"
                         placeholderTextColor={colors.textMuted}
                         value={newScheduleTitle}
                         onChangeText={setNewScheduleTitle}
                         style={styles.textInput}
                       />
-                      <TextInput
-                        placeholder="Tanggal & Jam (misal: 25 Sep 2027, 14:00)"
-                        placeholderTextColor={colors.textMuted}
-                        value={newScheduleDate}
-                        onChangeText={setNewScheduleDate}
-                        style={styles.textInput}
-                      />
-                      <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end' }}>
+
+                      {/* Date Picker Trigger */}
+                      <Text style={styles.scheduleFormLabel}>Tanggal Pertemuan</Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                          setShowScheduleCalendar((v) => !v);
+                        }}
+                        activeOpacity={0.75}
+                        style={styles.scheduleDateTrigger}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Ionicons name="calendar-outline" size={16} color={colors.accent} />
+                          <Text style={styles.scheduleDateTriggerText}>{newScheduleDate}</Text>
+                        </View>
+                        <Ionicons
+                          name={showScheduleCalendar ? 'chevron-up' : 'chevron-down'}
+                          size={16}
+                          color={colors.textSecondary}
+                        />
+                      </TouchableOpacity>
+
+                      {showScheduleCalendar ? (
+                        <View style={{ marginTop: 4 }}>
+                          <CalendarPicker
+                            selectedDate={newScheduleSelectedDate}
+                            weddingDate={safeWeddingDate}
+                            onSelectDate={handleScheduleDatePicked}
+                          />
+                        </View>
+                      ) : null}
+
+                      {/* Time Picker (Jam & Menit) */}
+                      <Text style={styles.scheduleFormLabel}>Waktu (Jam & Menit)</Text>
+                      <View style={styles.timePickerRow}>
+                        <View style={styles.timeSpinnerBox}>
+                          <TouchableOpacity
+                            onPress={() => setNewScheduleHour((h) => (h + 23) % 24)}
+                            style={styles.timeStepBtn}
+                          >
+                            <Ionicons name="remove" size={14} color={colors.textPrimary} />
+                          </TouchableOpacity>
+                          <Text style={styles.timeValueText}>
+                            {String(newScheduleHour).padStart(2, '0')}
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => setNewScheduleHour((h) => (h + 1) % 24)}
+                            style={styles.timeStepBtn}
+                          >
+                            <Ionicons name="add" size={14} color={colors.textPrimary} />
+                          </TouchableOpacity>
+                        </View>
+
+                        <Text style={styles.timeColon}>:</Text>
+
+                        <View style={styles.timeSpinnerBox}>
+                          <TouchableOpacity
+                            onPress={() => setNewScheduleMinute((m) => (m + 45) % 60)}
+                            style={styles.timeStepBtn}
+                          >
+                            <Ionicons name="remove" size={14} color={colors.textPrimary} />
+                          </TouchableOpacity>
+                          <Text style={styles.timeValueText}>
+                            {String(newScheduleMinute).padStart(2, '0')}
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => setNewScheduleMinute((m) => (m + 15) % 60)}
+                            style={styles.timeStepBtn}
+                          >
+                            <Ionicons name="add" size={14} color={colors.textPrimary} />
+                          </TouchableOpacity>
+                        </View>
+
+                        <Text style={styles.timeZoneLabel}>WIB</Text>
+                      </View>
+
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.quickTimeChipsRow}
+                      >
+                        {[
+                          { h: 9, m: 0, label: '09:00' },
+                          { h: 10, m: 0, label: '10:00' },
+                          { h: 13, m: 0, label: '13:00' },
+                          { h: 14, m: 0, label: '14:00' },
+                          { h: 16, m: 0, label: '16:00' },
+                          { h: 19, m: 0, label: '19:00' },
+                        ].map((preset) => {
+                          const active =
+                            newScheduleHour === preset.h && newScheduleMinute === preset.m;
+                          return (
+                            <TouchableOpacity
+                              key={preset.label}
+                              onPress={() => {
+                                setNewScheduleHour(preset.h);
+                                setNewScheduleMinute(preset.m);
+                              }}
+                              style={[
+                                styles.quickTimeChip,
+                                active && styles.quickTimeChipActive,
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.quickTimeChipText,
+                                  active && styles.quickTimeChipTextActive,
+                                ]}
+                              >
+                                {preset.label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+
+                      {/* Reminder / Pengingat Toggle */}
+                      <TouchableOpacity
+                        activeOpacity={0.75}
+                        onPress={() => {
+                          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                          setNewScheduleReminderEnabled((v) => !v);
+                        }}
+                        style={styles.reminderToggleRow}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Ionicons
+                            name={
+                              newScheduleReminderEnabled
+                                ? 'notifications'
+                                : 'notifications-off-outline'
+                            }
+                            size={16}
+                            color={
+                              newScheduleReminderEnabled ? colors.accent : colors.textMuted
+                            }
+                          />
+                          <Text style={styles.reminderToggleLabel}>
+                            Aktifkan Pengingat (Reminder)
+                          </Text>
+                        </View>
+                        <Badge
+                          label={newScheduleReminderEnabled ? 'Aktif' : 'Nonaktif'}
+                          variant={newScheduleReminderEnabled ? 'success' : 'neutral'}
+                        />
+                      </TouchableOpacity>
+
+                      {newScheduleReminderEnabled ? (
+                        <View style={styles.reminderLeadRow}>
+                          {[
+                            { mins: 30, label: '30 Mnt Sebelum' },
+                            { mins: 60, label: '1 Jam Sebelum' },
+                            { mins: 1440, label: 'H-1' },
+                          ].map((opt) => {
+                            const active = newScheduleReminderMinutes === opt.mins;
+                            return (
+                              <TouchableOpacity
+                                key={opt.mins}
+                                onPress={() => setNewScheduleReminderMinutes(opt.mins)}
+                                style={[
+                                  styles.quickTimeChip,
+                                  active && styles.quickTimeChipActive,
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.quickTimeChipText,
+                                    active && styles.quickTimeChipTextActive,
+                                  ]}
+                                >
+                                  {opt.label}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      ) : null}
+
+                      <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>
                         <TouchableOpacity
-                          onPress={() => setShowAddScheduleRow(false)}
+                          onPress={() => {
+                            setShowScheduleCalendar(false);
+                            setShowAddScheduleRow(false);
+                          }}
                           style={[styles.contactActionBtn, { backgroundColor: colors.border }]}
                         >
                           <Text style={[styles.contactActionText, { color: colors.textSecondary }]}>
@@ -969,7 +1193,18 @@ export default function BudgetScreen() {
                             >
                               {sc.title}
                             </Text>
-                            <Text style={styles.scheduleItemDate}>{sc.date}</Text>
+                            <Text style={styles.scheduleItemDate}>
+                              {sc.date}
+                              {sc.time ? ` • ${sc.time} WIB` : ''}
+                            </Text>
+                            {sc.reminderEnabled && !sc.completed ? (
+                              <View style={styles.scheduleReminderPill}>
+                                <Ionicons name="notifications-outline" size={11} color={colors.accent} />
+                                <Text style={styles.scheduleReminderPillText}>
+                                  Pengingat: {formatReminderLeadTime(sc.reminderMinutesBefore)}
+                                </Text>
+                              </View>
+                            ) : null}
                           </View>
                           <TouchableOpacity
                             onPress={() => handleDeleteSchedule(sc.id)}
@@ -1433,5 +1668,133 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 19,
     marginTop: 8,
+  },
+  scheduleFormLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  scheduleDateTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.bg,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  scheduleDateTriggerText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  timePickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
+  timeSpinnerBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    gap: 8,
+  },
+  timeStepBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: colors.cardBg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timeValueText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    fontVariant: ['tabular-nums'],
+    minWidth: 22,
+    textAlign: 'center',
+  },
+  timeColon: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  timeZoneLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textMuted,
+    marginLeft: 4,
+  },
+  quickTimeChipsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: 6,
+  },
+  quickTimeChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  quickTimeChipActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  quickTimeChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  quickTimeChipTextActive: {
+    color: '#FFF',
+  },
+  reminderToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginTop: 4,
+  },
+  reminderToggleLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  reminderLeadRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  scheduleReminderPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 3,
+  },
+  scheduleReminderPillText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.accent,
   },
 });

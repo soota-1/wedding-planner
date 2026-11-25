@@ -44,7 +44,11 @@ export interface CategoryItem {
 export interface VendorSchedule {
   id: string;
   title: string; // e.g. "Fitting Perdana", "Food Tasting", "Technical Meeting"
-  date: string; // e.g. "15 Jun 2027" or "14:00"
+  date: string; // e.g. "15 Jun 2027"
+  time?: string; // e.g. "14:00"
+  isoDateTime?: string; // ISO string for exact date+time sorting and reminder trigger
+  reminderEnabled?: boolean;
+  reminderMinutesBefore?: number; // e.g. 30, 60, 1440
   completed?: boolean;
 }
 
@@ -157,8 +161,26 @@ const initialVendors: VendorItem[] = [
     socialMedia: '@parokimariamedan',
     notes: 'Kapasitas 1000 undangan. Bebas biaya kebersihan dan genset standar.',
     schedules: [
-      { id: 'vs1', title: 'Technical Meeting Panitia & WO', date: '10 Sep 2027', completed: false },
-      { id: 'vs2', title: 'Gladi Bersih Tata Lampu & AC', date: '05 Okt 2027', completed: false },
+      {
+        id: 'vs1',
+        title: 'Technical Meeting Panitia & WO',
+        date: '10 Sep 2027',
+        time: '10:00',
+        isoDateTime: '2027-09-10T10:00:00',
+        reminderEnabled: true,
+        reminderMinutesBefore: 60,
+        completed: false,
+      },
+      {
+        id: 'vs2',
+        title: 'Gladi Bersih Tata Lampu & AC',
+        date: '05 Okt 2027',
+        time: '16:00',
+        isoDateTime: '2027-10-05T16:00:00',
+        reminderEnabled: true,
+        reminderMinutesBefore: 1440,
+        completed: false,
+      },
     ],
   },
   {
