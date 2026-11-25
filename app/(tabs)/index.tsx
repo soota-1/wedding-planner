@@ -24,7 +24,11 @@ import { StatCard } from '../../src/components/common/StatCard';
 import { ProgressBar } from '../../src/components/common/ProgressBar';
 import { Badge } from '../../src/components/common/Badge';
 import { FadeInView } from '../../src/components/common/FadeInView';
+import { SegmentedControl } from '../../src/components/common/SegmentedControl';
 import { useWeddingStore } from '../../src/stores/useWeddingStore';
+import { useAuthStore } from '../../src/stores/useAuthStore';
+import { AuthService } from '../../src/services/auth';
+import { CloudSyncService, isSupabaseConfigured } from '../../src/services/cloudSyncService';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -42,19 +46,74 @@ export default function DashboardScreen() {
   const updateProfile = useWeddingStore((s) => s.updateProfile);
   const resetAllData = useWeddingStore((s) => s.resetAllData);
 
-  // Settings Modal state
+  // Settings & Cloud Sync Modal state
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [settingsTab, setSettingsTab] = useState(0);
   const [formGroom, setFormGroom] = useState(profile.groomName);
   const [formBride, setFormBride] = useState(profile.brideName);
   const [formParish, setFormParish] = useState(profile.parishName);
   const [formDateInput, setFormDateInput] = useState(profile.weddingDate.slice(0, 10));
+
+  // Auth & Sync state
+  const authUser = useAuthStore((s) => s.user);
+  const activeWorkspace = useAuthStore((s) => s.activeWorkspace);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const cloudConfigured = isSupabaseConfigured();
 
   const openSettings = () => {
     setFormGroom(profile.groomName);
     setFormBride(profile.brideName);
     setFormParish(profile.parishName);
     setFormDateInput(profile.weddingDate.slice(0, 10));
+    setSyncMessage(null);
     setSettingsVisible(true);
+  };
+
+  const handleLogin = async () => {
+    if (!cloudConfigured) {
+      setSyncMessage('Mode Offline: Tambahkan file .env Supabase untuk mengaktifkan login cloud.');
+      return;
+    }
+    if (!loginEmail.trim() || !loginPassword) {
+      setSyncMessage('Mohon isi email dan kata sandi terlebih dahulu.');
+      return;
+    }
+    setIsSyncing(true);
+    setSyncMessage(null);
+    try {
+      const res = await AuthService.loginWithEmail(loginEmail.trim(), loginPassword);
+      if (res.user) {
+        await CloudSyncService.fetchWorkspaceForUser(res.user.id);
+        setSyncMessage('Berhasil masuk ke workspace pasangan!');
+      }
+    } catch (err: any) {
+      setSyncMessage(err?.message || 'Gagal masuk. Periksa email dan kata sandi Anda.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleSyncNow = async () => {
+    setIsSyncing(true);
+    const result = await CloudSyncService.syncNow();
+    setSyncMessage(result.message);
+    setIsSyncing(false);
+  };
+
+  const handleSignOut = async () => {
+    setIsSyncing(true);
+    try {
+      await AuthService.signOut();
+      setSyncMessage('Berhasil keluar dari akun cloud.');
+    } catch {
+      useAuthStore.getState().reset();
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleSaveSettings = () => {
@@ -313,72 +372,173 @@ export default function DashboardScreen() {
           />
           <View style={styles.modalSheet}>
             <View style={styles.sheetHandle} />
-            <Text style={styles.modalHeading}>Pengaturan Pernikahan</Text>
+            <Text style={styles.modalHeading}>Pengaturan & Sinkronisasi</Text>
+
+            <SegmentedControl
+              options={['Profil & Hari H', 'Akun & Cloud Sync']}
+              selectedIndex={settingsTab}
+              onChange={setSettingsTab}
+              style={{ marginBottom: 14 }}
+            />
 
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              <View style={styles.syncStatusPill}>
-                <Ionicons name="checkmark-circle" size={15} color={colors.success} />
-                <Text style={styles.syncStatusText}>
-                  Penyimpanan Lokal Aktif • Data tersimpan otomatis di perangkat
-                </Text>
-              </View>
+              {settingsTab === 0 ? (
+                <>
+                  <View style={styles.syncStatusPill}>
+                    <Ionicons name="checkmark-circle" size={15} color={colors.success} />
+                    <Text style={styles.syncStatusText}>
+                      Penyimpanan Lokal Aktif • Data tersimpan otomatis di perangkat
+                    </Text>
+                  </View>
 
-              <Text style={styles.fieldLabel}>Nama Mempelai Pria</Text>
-              <TextInput
-                style={styles.textInput}
-                value={formGroom}
-                onChangeText={setFormGroom}
-                placeholder="Octa"
-                placeholderTextColor={colors.textMuted}
-              />
+                  <Text style={styles.fieldLabel}>Nama Mempelai Pria</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={formGroom}
+                    onChangeText={setFormGroom}
+                    placeholder="Octa"
+                    placeholderTextColor={colors.textMuted}
+                  />
 
-              <Text style={styles.fieldLabel}>Nama Mempelai Wanita</Text>
-              <TextInput
-                style={styles.textInput}
-                value={formBride}
-                onChangeText={setFormBride}
-                placeholder="Jenesia"
-                placeholderTextColor={colors.textMuted}
-              />
+                  <Text style={styles.fieldLabel}>Nama Mempelai Wanita</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={formBride}
+                    onChangeText={setFormBride}
+                    placeholder="Jenesia"
+                    placeholderTextColor={colors.textMuted}
+                  />
 
-              <Text style={styles.fieldLabel}>Paroki / Lokasi Pemberkatan</Text>
-              <TextInput
-                style={styles.textInput}
-                value={formParish}
-                onChangeText={setFormParish}
-                placeholder="Paroki St. Perawan Maria"
-                placeholderTextColor={colors.textMuted}
-              />
+                  <Text style={styles.fieldLabel}>Paroki / Lokasi Pemberkatan</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={formParish}
+                    onChangeText={setFormParish}
+                    placeholder="Paroki St. Perawan Maria"
+                    placeholderTextColor={colors.textMuted}
+                  />
 
-              <Text style={styles.fieldLabel}>Tanggal Hari H (YYYY-MM-DD)</Text>
-              <TextInput
-                style={styles.textInput}
-                value={formDateInput}
-                onChangeText={setFormDateInput}
-                placeholder="2027-10-10"
-                placeholderTextColor={colors.textMuted}
-              />
-              <Text style={styles.helperSubtext}>
-                Mengubah tanggal Hari H otomatis menggeser tenggat semua tugas yang belum selesai.
-              </Text>
+                  <Text style={styles.fieldLabel}>Tanggal Hari H (YYYY-MM-DD)</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={formDateInput}
+                    onChangeText={setFormDateInput}
+                    placeholder="2027-10-10"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  <Text style={styles.helperSubtext}>
+                    Mengubah tanggal Hari H otomatis menggeser tenggat semua tugas yang belum selesai.
+                  </Text>
 
-              <View style={styles.modalActionRow}>
-                <TouchableOpacity
-                  onPress={handleResetData}
-                  style={styles.resetButton}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="refresh-outline" size={16} color={colors.danger} />
-                  <Text style={styles.resetButtonText}>Reset Default</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleSaveSettings}
-                  style={styles.saveButton}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.saveButtonText}>Simpan Profil</Text>
-                </TouchableOpacity>
-              </View>
+                  <View style={styles.modalActionRow}>
+                    <TouchableOpacity
+                      onPress={handleResetData}
+                      style={styles.resetButton}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="refresh-outline" size={16} color={colors.danger} />
+                      <Text style={styles.resetButtonText}>Reset Default</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={handleSaveSettings}
+                      style={styles.saveButton}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.saveButtonText}>Simpan Profil</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <View style={styles.syncStatusPill}>
+                    <Ionicons
+                      name={cloudConfigured ? 'cloud-done-outline' : 'cloud-offline-outline'}
+                      size={16}
+                      color={cloudConfigured ? colors.success : colors.warning}
+                    />
+                    <Text style={styles.syncStatusText}>
+                      {cloudConfigured
+                        ? 'Supabase Cloud Terhubung • Siap sinkronisasi antar perangkat'
+                        : 'Mode Lokal Offline • Tambahkan .env Supabase untuk sinkronisasi pasangan'}
+                    </Text>
+                  </View>
+
+                  {isAuthenticated && authUser ? (
+                    <>
+                      <Text style={styles.fieldLabel}>Akun Terhubung</Text>
+                      <Text style={styles.accountValue}>{authUser.email || authUser.id}</Text>
+                      {activeWorkspace ? (
+                        <>
+                          <Text style={styles.fieldLabel}>Workspace Bersama</Text>
+                          <Text style={styles.accountValue}>{activeWorkspace.name}</Text>
+                        </>
+                      ) : null}
+
+                      {syncMessage ? <Text style={styles.syncFeedback}>{syncMessage}</Text> : null}
+
+                      <View style={styles.modalActionRow}>
+                        <TouchableOpacity
+                          onPress={handleSignOut}
+                          style={styles.resetButton}
+                          activeOpacity={0.8}
+                          disabled={isSyncing}
+                        >
+                          <Ionicons name="log-out-outline" size={16} color={colors.danger} />
+                          <Text style={styles.resetButtonText}>Keluar</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={handleSyncNow}
+                          style={styles.saveButton}
+                          activeOpacity={0.8}
+                          disabled={isSyncing}
+                        >
+                          <Text style={styles.saveButtonText}>
+                            {isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Sekarang'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.fieldLabel}>Email Pasangan</Text>
+                      <TextInput
+                        style={styles.textInput}
+                        value={loginEmail}
+                        onChangeText={setLoginEmail}
+                        placeholder="octaadsp@gmail.com"
+                        placeholderTextColor={colors.textMuted}
+                        autoCapitalize="none"
+                        keyboardType="email-address"
+                      />
+
+                      <Text style={styles.fieldLabel}>Kata Sandi</Text>
+                      <TextInput
+                        style={styles.textInput}
+                        value={loginPassword}
+                        onChangeText={setLoginPassword}
+                        placeholder="••••••••"
+                        placeholderTextColor={colors.textMuted}
+                        secureTextEntry
+                      />
+
+                      {syncMessage ? <Text style={styles.syncFeedback}>{syncMessage}</Text> : null}
+
+                      <View style={styles.modalActionRow}>
+                        <TouchableOpacity
+                          onPress={handleLogin}
+                          style={styles.saveButton}
+                          activeOpacity={0.8}
+                          disabled={isSyncing}
+                        >
+                          <Text style={styles.saveButtonText}>
+                            {isSyncing ? 'Memproses...' : 'Masuk & Hubungkan Cloud'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  )}
+                </>
+              )}
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
@@ -686,5 +846,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: colors.danger,
+  },
+  accountValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  syncFeedback: {
+    fontSize: 12,
+    color: colors.accent,
+    fontWeight: '500',
+    marginTop: 12,
+    lineHeight: 17,
   },
 });
