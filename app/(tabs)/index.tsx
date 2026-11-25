@@ -44,6 +44,7 @@ export default function DashboardScreen() {
   const transactions = useWeddingStore((s) => s.transactions);
   const guests = useWeddingStore((s) => s.guests);
   const documents = useWeddingStore((s) => s.documents);
+  const moodboardItems = useWeddingStore((s) => s.moodboardItems);
   const updateProfile = useWeddingStore((s) => s.updateProfile);
   const hydrateFromCloud = useWeddingStore((s) => s.hydrateFromCloud);
   const resetAllData = useWeddingStore((s) => s.resetAllData);
@@ -359,6 +360,44 @@ export default function DashboardScreen() {
                 </TouchableOpacity>
               ))
             )}
+          </Card>
+        </FadeInView>
+
+        {/* 5. Moodboard & Visual References Card */}
+        <FadeInView delay={260}>
+          <Card onPress={() => router.push('/moodboard')}>
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.rowTitleGroup}>
+                <Ionicons name="images-outline" size={18} color={colors.accent} />
+                <Text style={styles.sectionTitle}>Moodboard & Referensi</Text>
+              </View>
+              <Badge
+                label={`${moodboardItems.filter((m) => m.isFinal).length} Final ★`}
+                variant="accent"
+              />
+            </View>
+            <Text style={styles.mutedSubtext}>
+              {moodboardItems.length === 0
+                ? 'Simpan inspirasi dekorasi, busana, MUA & foto agar mudah dikirim ke vendor'
+                : `${moodboardItems.length} inspirasi visual tersimpan & tersinkron online`}
+            </Text>
+            {moodboardItems.length > 0 ? (
+              <View style={styles.moodPreviewRow}>
+                {moodboardItems.slice(0, 4).map((m) =>
+                  m.imageUrl ? (
+                    <Image key={m.id} source={{ uri: m.imageUrl }} style={styles.moodPreviewThumb} />
+                  ) : (
+                    <View key={m.id} style={styles.moodPreviewLinkBox}>
+                      <Ionicons name="link-outline" size={16} color={colors.accent} />
+                    </View>
+                  )
+                )}
+              </View>
+            ) : null}
+            <View style={[styles.cardFooterLinkRow, { marginTop: 10 }]}>
+              <Text style={styles.linkText}>Buka Galeri Moodboard</Text>
+              <Ionicons name="chevron-forward" size={14} color={colors.accent} />
+            </View>
           </Card>
         </FadeInView>
       </ScrollView>
@@ -876,5 +915,24 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 12,
     lineHeight: 17,
+  },
+  moodPreviewRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
+  moodPreviewThumb: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceMuted,
+  },
+  moodPreviewLinkBox: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    backgroundColor: colors.accentLight,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

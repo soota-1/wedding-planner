@@ -13,8 +13,10 @@ import {
   UIManager,
   Linking,
   Alert,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { format, subDays } from 'date-fns';
 import { colors } from '../../src/theme/colors';
@@ -28,6 +30,7 @@ import { SegmentedControl } from '../../src/components/common/SegmentedControl';
 import { FadeInView } from '../../src/components/common/FadeInView';
 import { CalendarPicker } from '../../src/components/common/CalendarPicker';
 import { NotificationService, formatReminderLeadTime } from '../../src/services/notificationService';
+import { exportMoodboardBriefPdf } from '../../src/services/moodboardShareService';
 import {
   useWeddingStore,
   CategoryItem,
@@ -41,13 +44,16 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 export default function BudgetScreen() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState(0);
 
   // Store state & actions
   const categories = useWeddingStore((s) => s.categories);
   const vendors = useWeddingStore((s) => s.vendors);
   const transactions = useWeddingStore((s) => s.transactions);
-  const weddingDateIso = useWeddingStore((s) => s.profile.weddingDate);
+  const moodboardItems = useWeddingStore((s) => s.moodboardItems);
+  const profile = useWeddingStore((s) => s.profile);
+  const weddingDateIso = profile.weddingDate;
 
   const parsedWedding = new Date(weddingDateIso);
   const safeWeddingDate = isNaN(parsedWedding.getTime())
@@ -1243,6 +1249,93 @@ export default function BudgetScreen() {
                       'Belum ada catatan kesepakatan tertulis. Tekan Edit untuk menambahkan klausul atau bonus vendor.'}
                   </Text>
                 </View>
+
+                {/* 5. Moodboard & Referensi Vendor Ini */}
+                {(() => {
+                  const vendorMoodboard = moodboardItems.filter(
+                    (m) => m.vendorId === selectedVendorForDetail.id
+                  );
+                  return (
+                    <View style={styles.detailCardBox}>
+                      <View style={styles.rowBetween}>
+                        <Text style={styles.detailCardLabel}>
+                          Moodboard & Referensi ({vendorMoodboard.length})
+                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                          <TouchableOpacity
+                            onPress={async () => {
+                              const res = await exportMoodboardBriefPdf({
+                                items: vendorMoodboard,
+                                scopeTitle: selectedVendorForDetail.name,
+                                profile,
+                                vendor: selectedVendorForDetail,
+                              });
+                              if (!res.ok) {
+                                Alert.alert('Info Brief PDF', res.message);
+                              }
+                            }}
+                            style={styles.testNotifPill}
+                            activeOpacity={0.75}
+                          >
+                            <Ionicons name="document-attach-outline" size={13} color={colors.accent} />
+                            <Text style={styles.testNotifPillText}>Kirim Brief PDF</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => {
+                              const vid = selectedVendorForDetail.id;
+                              setSelectedVendorForDetail(null);
+                              router.push(`/moodboard?vendorId=${vid}` as any);
+                            }}
+                            style={styles.addScheduleLink}
+                          >
+                            <Ionicons name="add-circle-outline" size={16} color={colors.accent} />
+                            <Text style={styles.addScheduleLinkText}>Kelola</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      {vendorMoodboard.length > 0 ? (
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={{ gap: 8, marginTop: 10 }}
+                        >
+                          {vendorMoodboard.map((m) => (
+                            <TouchableOpacity
+                              key={m.id}
+                              activeOpacity={0.8}
+                              onPress={() => {
+                                const vid = selectedVendorForDetail.id;
+                                setSelectedVendorForDetail(null);
+                                router.push(`/moodboard?vendorId=${vid}` as any);
+                              }}
+                              style={styles.vendorMoodThumbCard}
+                            >
+                              {m.imageUrl ? (
+                                <Image
+                                  source={{ uri: m.imageUrl }}
+                                  style={styles.vendorMoodThumbImg}
+                                />
+                              ) : (
+                                <View style={styles.vendorMoodThumbLink}>
+                                  <Ionicons name="link-outline" size={18} color={colors.accent} />
+                                </View>
+                              )}
+                              <Text style={styles.vendorMoodThumbTitle} numberOfLines={1}>
+                                {m.isFinal ? '★ ' : ''}
+                                {m.title}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      ) : (
+                        <Text style={[styles.subLabel, { fontStyle: 'italic', marginTop: 8 }]}>
+                          Belum ada referensi visual yang ditautkan ke vendor ini. Ketuk Kelola untuk menambahkan.
+                        </Text>
+                      )}
+                    </View>
+                  );
+                })()}
               </ScrollView>
             </View>
           ) : null}
@@ -1823,5 +1916,32 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: colors.accent,
+  },
+  vendorMoodThumbCard: {
+    width: 92,
+    borderRadius: 10,
+    backgroundColor: colors.cardBg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  vendorMoodThumbImg: {
+    width: 92,
+    height: 70,
+    backgroundColor: colors.surfaceMuted,
+  },
+  vendorMoodThumbLink: {
+    width: 92,
+    height: 70,
+    backgroundColor: colors.accentLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vendorMoodThumbTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    paddingHorizontal: 6,
+    paddingVertical: 5,
   },
 });

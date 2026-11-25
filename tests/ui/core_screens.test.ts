@@ -26,8 +26,9 @@ describe('Core Tab Screens (Dashboard, Checklist, Budget)', () => {
     expect(typeof BudgetScreen).toBe('function');
   });
 
-  it('renders DashboardScreen without throwing errors', () => {
-    expect(() => DashboardScreen()).not.toThrow();
+  it('renders DashboardScreen without throwing errors and includes Moodboard entry card', () => {
+    const tree = DashboardScreen();
+    expect(JSON.stringify(tree)).toContain('Moodboard & Referensi');
   });
 
   it('renders ChecklistScreen without throwing errors', () => {
