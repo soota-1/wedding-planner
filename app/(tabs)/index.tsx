@@ -1,9 +1,21 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  LayoutAnimation,
+  UIManager,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { differenceInCalendarDays } from 'date-fns';
+import { differenceInCalendarDays, format } from 'date-fns';
 import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 import { Card } from '../../src/components/common/Card';
@@ -12,24 +24,103 @@ import { StatCard } from '../../src/components/common/StatCard';
 import { ProgressBar } from '../../src/components/common/ProgressBar';
 import { Badge } from '../../src/components/common/Badge';
 import { FadeInView } from '../../src/components/common/FadeInView';
+import { useWeddingStore } from '../../src/stores/useWeddingStore';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const weddingDate = new Date('2027-10-10T00:00:00.000Z');
-  const daysRemaining = Math.max(0, differenceInCalendarDays(weddingDate, new Date()));
 
-  const progressPercent = 68;
-  const targetBudget = 150000000;
-  const cashSpent = 35000000;
-  const totalCommitted = 158000000;
+  const profile = useWeddingStore((s) => s.profile);
+  const tasks = useWeddingStore((s) => s.tasks);
+  const categories = useWeddingStore((s) => s.categories);
+  const transactions = useWeddingStore((s) => s.transactions);
+  const guests = useWeddingStore((s) => s.guests);
+  const documents = useWeddingStore((s) => s.documents);
+  const updateProfile = useWeddingStore((s) => s.updateProfile);
+  const resetAllData = useWeddingStore((s) => s.resetAllData);
+
+  // Settings Modal state
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [formGroom, setFormGroom] = useState(profile.groomName);
+  const [formBride, setFormBride] = useState(profile.brideName);
+  const [formParish, setFormParish] = useState(profile.parishName);
+  const [formDateInput, setFormDateInput] = useState(profile.weddingDate.slice(0, 10));
+
+  const openSettings = () => {
+    setFormGroom(profile.groomName);
+    setFormBride(profile.brideName);
+    setFormParish(profile.parishName);
+    setFormDateInput(profile.weddingDate.slice(0, 10));
+    setSettingsVisible(true);
+  };
+
+  const handleSaveSettings = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    let nextIso = profile.weddingDate;
+    const parsed = new Date(`${formDateInput.trim()}T00:00:00.000Z`);
+    if (!isNaN(parsed.getTime())) {
+      nextIso = parsed.toISOString();
+    }
+    updateProfile({
+      groomName: formGroom.trim() || 'Octa',
+      brideName: formBride.trim() || 'Jenesia',
+      parishName: formParish.trim() || 'Paroki St. Perawan Maria',
+      weddingDate: nextIso,
+    });
+    setSettingsVisible(false);
+  };
+
+  const handleResetData = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    resetAllData();
+    setSettingsVisible(false);
+  };
+
+  const weddingDate = new Date(profile.weddingDate);
+  const safeWeddingDate = isNaN(weddingDate.getTime()) ? new Date('2027-10-10T00:00:00.000Z') : weddingDate;
+  const daysRemaining = Math.max(0, differenceInCalendarDays(safeWeddingDate, new Date()));
+  const formattedWeddingDate = format(safeWeddingDate, 'dd MMM yyyy');
+
+  // Checklist metrics
+  const totalTasks = tasks.length;
+  const completedTasks = tasks.filter((t) => t.completed).length;
+  const progressPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  // Guest metrics
+  const confirmedAttendingPax = guests
+    .filter((g) => g.rsvpStatus === 'attending')
+    .reduce((acc, g) => acc + (g.actualPax > 0 ? g.actualPax : g.estimatedPax), 0);
+
+  // Financial metrics
+  const targetBudget = categories.reduce((acc, c) => acc + c.allocated, 0);
+  const cashSpent = transactions
+    .filter((tx) => tx.status === 'paid')
+    .reduce((acc, tx) => acc + tx.amount, 0);
+  const totalCommitted = categories.reduce((acc, c) => acc + c.committed, 0);
   const overBudgetAmount = totalCommitted - targetBudget;
   const isOverBudget = overBudgetAmount > 0;
 
-  const upcomingTasks = [
-    { id: '1', title: 'Kursus Persiapan Perkawinan (KPP)', dueDate: '13 Apr 2027', priority: 'critical', daysLeft: 'H-180' },
-    { id: '2', title: 'Cetak Surat Baptis Terbaru', dueDate: '13 Mei 2027', priority: 'high', daysLeft: 'H-150' },
-    { id: '3', title: 'Penyelidikan Kanonik Pastor', dueDate: '12 Jul 2027', priority: 'critical', daysLeft: 'H-90' },
-  ];
+  const groomContrib = transactions
+    .filter((tx) => tx.status === 'paid' && tx.paidBy === 'groom')
+    .reduce((acc, tx) => acc + tx.amount, 0);
+  const brideContrib = transactions
+    .filter((tx) => tx.status === 'paid' && tx.paidBy === 'bride')
+    .reduce((acc, tx) => acc + tx.amount, 0);
+  const familyContrib = transactions
+    .filter((tx) => tx.status === 'paid' && tx.paidBy === 'family')
+    .reduce((acc, tx) => acc + tx.amount, 0);
+
+  // Document metrics
+  const expiredDocsCount = documents.filter((d) => d.status === 'expired').length;
+
+  // Upcoming 3 uncompleted tasks sorted by earliest offsetDays
+  const upcomingTasks = [...tasks]
+    .filter((t) => !t.completed)
+    .sort((a, b) => a.offsetDays - b.offsetDays)
+    .slice(0, 3);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -40,8 +131,18 @@ export default function DashboardScreen() {
       >
         <Header
           kicker="Sakramen & Resepsi"
-          title="Octa & Jenesia"
-          subtitle="10 Oktober 2027 • Paroki St. Perawan Maria"
+          title={`${profile.groomName} & ${profile.brideName}`}
+          subtitle={`${formattedWeddingDate} • ${profile.parishName}`}
+          rightElement={
+            <TouchableOpacity
+              onPress={openSettings}
+              activeOpacity={0.75}
+              style={styles.settingsButton}
+              accessibilityLabel="Pengaturan Pernikahan"
+            >
+              <Ionicons name="settings-outline" size={20} color={colors.textPrimary} />
+            </TouchableOpacity>
+          }
         />
 
         {/* 1. Minimalist Hero Countdown Card */}
@@ -60,12 +161,27 @@ export default function DashboardScreen() {
                 </View>
                 <View style={styles.heroMiniMetric}>
                   <Text style={styles.heroMiniLabel}>Tamu Hadir</Text>
-                  <Text style={styles.heroMiniValue}>7 Pax Fix</Text>
+                  <Text style={styles.heroMiniValue}>{confirmedAttendingPax} Pax Fix</Text>
                 </View>
               </View>
             </View>
           </Card>
         </FadeInView>
+
+        {/* Alert Banner if Canonical Docs Expired */}
+        {expiredDocsCount > 0 ? (
+          <FadeInView delay={70}>
+            <Card onPress={() => router.push('/documents')} style={styles.alertCard}>
+              <View style={styles.alertRow}>
+                <Ionicons name="alert-circle-outline" size={18} color={colors.warning} />
+                <Text style={styles.alertText}>
+                  {expiredDocsCount} dokumen kanonik kedaluwarsa perlu diperbarui
+                </Text>
+                <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+              </View>
+            </Card>
+          </FadeInView>
+        ) : null}
 
         {/* 2. Smooth Progress Card */}
         <FadeInView delay={100}>
@@ -79,7 +195,9 @@ export default function DashboardScreen() {
             </View>
             <ProgressBar progress={progressPercent} height={7} style={styles.progressBar} />
             <View style={styles.cardFooterLinkRow}>
-              <Text style={styles.mutedSubtext}>18 dari 26 tugas utama selesai</Text>
+              <Text style={styles.mutedSubtext}>
+                {completedTasks} dari {totalTasks} tugas utama selesai
+              </Text>
               <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
             </View>
           </Card>
@@ -119,16 +237,16 @@ export default function DashboardScreen() {
                 </Text>
               </View>
               <View style={styles.ledgerRow}>
-                <Text style={styles.ledgerLabel}>Kontribusi Octa</Text>
-                <Text style={styles.ledgerValue}>Rp 10.000.000</Text>
+                <Text style={styles.ledgerLabel}>Kontribusi {profile.groomName}</Text>
+                <Text style={styles.ledgerValue}>Rp {groomContrib.toLocaleString('id-ID')}</Text>
               </View>
               <View style={styles.ledgerRow}>
-                <Text style={styles.ledgerLabel}>Kontribusi Jenesia</Text>
-                <Text style={styles.ledgerValue}>Rp 20.000.000</Text>
+                <Text style={styles.ledgerLabel}>Kontribusi {profile.brideName}</Text>
+                <Text style={styles.ledgerValue}>Rp {brideContrib.toLocaleString('id-ID')}</Text>
               </View>
               <View style={[styles.ledgerRow, styles.ledgerRowLast]}>
                 <Text style={styles.ledgerLabel}>Dukungan Keluarga</Text>
-                <Text style={styles.ledgerValue}>Rp 5.000.000</Text>
+                <Text style={styles.ledgerValue}>Rp {familyContrib.toLocaleString('id-ID')}</Text>
               </View>
             </View>
           </Card>
@@ -147,31 +265,124 @@ export default function DashboardScreen() {
               </TouchableOpacity>
             </View>
 
-            {upcomingTasks.map((t, idx) => (
-              <TouchableOpacity
-                key={t.id}
-                onPress={() => router.push('/checklist')}
-                activeOpacity={0.7}
-                style={[styles.agendaRow, idx === upcomingTasks.length - 1 && styles.agendaRowLast]}
-              >
-                <View style={styles.agendaLeft}>
-                  <Text style={styles.agendaTitle} numberOfLines={1}>
-                    {t.title}
-                  </Text>
-                  <Text style={styles.agendaDate}>{t.dueDate}</Text>
-                </View>
-                <View style={styles.agendaRight}>
-                  <Badge
-                    label={t.daysLeft}
-                    variant={t.priority === 'critical' ? 'danger' : 'warning'}
-                  />
-                  <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
-                </View>
-              </TouchableOpacity>
-            ))}
+            {upcomingTasks.length === 0 ? (
+              <Text style={styles.mutedSubtext}>Semua tugas telah diselesaikan!</Text>
+            ) : (
+              upcomingTasks.map((t, idx) => (
+                <TouchableOpacity
+                  key={t.id}
+                  onPress={() => router.push('/checklist')}
+                  activeOpacity={0.7}
+                  style={[styles.agendaRow, idx === upcomingTasks.length - 1 && styles.agendaRowLast]}
+                >
+                  <View style={styles.agendaLeft}>
+                    <Text style={styles.agendaTitle} numberOfLines={1}>
+                      {t.title}
+                    </Text>
+                    <Text style={styles.agendaDate}>{t.dueDate}</Text>
+                  </View>
+                  <View style={styles.agendaRight}>
+                    <Badge
+                      label={`H${t.offsetDays}`}
+                      variant={t.priority === 'critical' ? 'danger' : 'warning'}
+                    />
+                    <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
           </Card>
         </FadeInView>
       </ScrollView>
+
+      {/* Workspace Settings Modal */}
+      <Modal
+        visible={settingsVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSettingsVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setSettingsVisible(false)}
+          />
+          <View style={styles.modalSheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.modalHeading}>Pengaturan Pernikahan</Text>
+
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <View style={styles.syncStatusPill}>
+                <Ionicons name="checkmark-circle" size={15} color={colors.success} />
+                <Text style={styles.syncStatusText}>
+                  Penyimpanan Lokal Aktif • Data tersimpan otomatis di perangkat
+                </Text>
+              </View>
+
+              <Text style={styles.fieldLabel}>Nama Mempelai Pria</Text>
+              <TextInput
+                style={styles.textInput}
+                value={formGroom}
+                onChangeText={setFormGroom}
+                placeholder="Octa"
+                placeholderTextColor={colors.textMuted}
+              />
+
+              <Text style={styles.fieldLabel}>Nama Mempelai Wanita</Text>
+              <TextInput
+                style={styles.textInput}
+                value={formBride}
+                onChangeText={setFormBride}
+                placeholder="Jenesia"
+                placeholderTextColor={colors.textMuted}
+              />
+
+              <Text style={styles.fieldLabel}>Paroki / Lokasi Pemberkatan</Text>
+              <TextInput
+                style={styles.textInput}
+                value={formParish}
+                onChangeText={setFormParish}
+                placeholder="Paroki St. Perawan Maria"
+                placeholderTextColor={colors.textMuted}
+              />
+
+              <Text style={styles.fieldLabel}>Tanggal Hari H (YYYY-MM-DD)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={formDateInput}
+                onChangeText={setFormDateInput}
+                placeholder="2027-10-10"
+                placeholderTextColor={colors.textMuted}
+              />
+              <Text style={styles.helperSubtext}>
+                Mengubah tanggal Hari H otomatis menggeser tenggat semua tugas yang belum selesai.
+              </Text>
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  onPress={handleResetData}
+                  style={styles.resetButton}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="refresh-outline" size={16} color={colors.danger} />
+                  <Text style={styles.resetButtonText}>Reset Default</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleSaveSettings}
+                  style={styles.saveButton}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.saveButtonText}>Simpan Profil</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -188,6 +399,16 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.xl,
+  },
+  settingsButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.cardBg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   heroCard: {
     paddingVertical: 20,
@@ -238,6 +459,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.textPrimary,
     marginTop: 1,
+  },
+  alertCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.warning,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+  },
+  alertRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  alertText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textPrimary,
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -339,5 +577,114 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
+  modalBackdrop: {
+    flex: 1,
+  },
+  modalSheet: {
+    backgroundColor: colors.cardBg,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: spacing.lg,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    maxHeight: '85%',
+  },
+  sheetHandle: {
+    width: 38,
+    height: 4,
+    backgroundColor: colors.borderDark,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  modalHeading: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 14,
+    letterSpacing: -0.3,
+  },
+  syncStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 8,
+  },
+  syncStatusText: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  textInput: {
+    backgroundColor: colors.bg,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: colors.textPrimary,
+  },
+  helperSubtext: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 6,
+    lineHeight: 16,
+  },
+  modalActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 22,
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  saveButton: {
+    flex: 1,
+    backgroundColor: colors.accent,
+    paddingVertical: 13,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textLight,
+  },
+  resetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    gap: 4,
+  },
+  resetButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.danger,
   },
 });

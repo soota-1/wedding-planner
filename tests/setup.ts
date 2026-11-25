@@ -11,6 +11,8 @@ const defaultDispatcher = {
   useMemo: (fn: any) => fn(),
   useRef: (initial: any) => ({ current: initial }),
   useContext: (ctx: any) => ctx?._currentValue || {},
+  useSyncExternalStore: (_subscribe: any, getSnapshot: any) => getSnapshot(),
+  useDebugValue: jest.fn(),
   useId: () => 'mock-id',
 };
 
@@ -20,6 +22,7 @@ const ReactSharedInternals =
 
 if (ReactSharedInternals) {
   ReactSharedInternals.ReactCurrentDispatcher = { current: defaultDispatcher };
+  ReactSharedInternals.H = defaultDispatcher;
 }
 
 // React Native Mocks for Jest Node Environment
@@ -109,4 +112,22 @@ jest.mock('react-native-safe-area-context', () => ({
   SafeAreaProvider: ({ children }: any) => children,
   SafeAreaView: ({ children, style }: any) => reactModule.createElement('SafeAreaView', { style }, children),
   useSafeAreaInsets: () => ({ top: 44, bottom: 34, left: 0, right: 0 }),
+}));
+
+// AsyncStorage Mock for Jest Node Environment
+const memoryStorage: Record<string, string> = {};
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  __esModule: true,
+  default: {
+    getItem: jest.fn(async (key: string) => memoryStorage[key] ?? null),
+    setItem: jest.fn(async (key: string, value: string) => {
+      memoryStorage[key] = value;
+    }),
+    removeItem: jest.fn(async (key: string) => {
+      delete memoryStorage[key];
+    }),
+    clear: jest.fn(async () => {
+      Object.keys(memoryStorage).forEach((k) => delete memoryStorage[k]);
+    }),
+  },
 }));

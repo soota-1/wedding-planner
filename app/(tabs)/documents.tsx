@@ -22,79 +22,21 @@ import { Badge } from '../../src/components/common/Badge';
 import { ProgressBar } from '../../src/components/common/ProgressBar';
 import { FilterChipBar } from '../../src/components/common/FilterChipBar';
 import { FadeInView } from '../../src/components/common/FadeInView';
+import { useWeddingStore, DocumentItem } from '../../src/stores/useWeddingStore';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-interface DocumentItem {
-  id: string;
-  title: string;
-  documentType: string;
-  category: 'church_canonical' | 'civil_disdukcapil';
-  owner: 'groom' | 'bride' | 'both';
-  issueDate?: string;
-  ageDays?: number;
-  status: 'verified' | 'pending' | 'expired';
-  notes?: string;
-}
-
-const initialDocuments: DocumentItem[] = [
-  {
-    id: 'd1',
-    title: 'Surat Baptis Octa',
-    documentType: 'Surat Baptis Katolik',
-    category: 'church_canonical',
-    owner: 'groom',
-    issueDate: '12 Jul 2027',
-    ageDays: 90,
-    status: 'verified',
-    notes: 'Umur berkas 90 hari (memenuhi syarat maks. 180 hari).',
-  },
-  {
-    id: 'd2',
-    title: 'Surat Baptis Jenesia',
-    documentType: 'Surat Baptis Katolik',
-    category: 'church_canonical',
-    owner: 'bride',
-    issueDate: '10 Jan 2027',
-    ageDays: 273,
-    status: 'expired',
-    notes: 'Berusia 273 hari (>180 hari). Mohon cetak ulang di paroki asal.',
-  },
-  {
-    id: 'd3',
-    title: 'Sertifikat KPP',
-    documentType: 'Kursus Perkawinan',
-    category: 'church_canonical',
-    owner: 'both',
-    status: 'verified',
-    notes: 'Komisi Kerasulan Keluarga Dekenat (berlaku seumur hidup).',
-  },
-  {
-    id: 'd4',
-    title: 'Formulir N1 - N4 Kelurahan',
-    documentType: 'Dokumen Sipil',
-    category: 'civil_disdukcapil',
-    owner: 'both',
-    status: 'verified',
-    notes: 'Surat pengantar RT/RW dan Kelurahan untuk Disdukcapil.',
-  },
-  {
-    id: 'd5',
-    title: 'KTP & Kartu Keluarga',
-    documentType: 'Identitas Kependudukan',
-    category: 'civil_disdukcapil',
-    owner: 'both',
-    status: 'verified',
-    notes: 'Scan legalisir dan arsip digital kedua mempelai.',
-  },
-];
-
 const docCategories = ['Semua', 'Gereja Katolik', 'Sipil Disdukcapil'];
 
 export default function DocumentsScreen() {
-  const [docs, setDocs] = useState<DocumentItem[]>(initialDocuments);
+  const docs = useWeddingStore((s) => s.documents);
+  const cycleDocumentStatusStore = useWeddingStore((s) => s.cycleDocumentStatus);
+  const addDocumentStore = useWeddingStore((s) => s.addDocument);
+  const updateDocumentStore = useWeddingStore((s) => s.updateDocument);
+  const deleteDocumentStore = useWeddingStore((s) => s.deleteDocument);
+
   const [catIndex, setCatIndex] = useState(0);
 
   // Modal State
@@ -113,14 +55,7 @@ export default function DocumentsScreen() {
   // Single tap: cycle status
   const toggleDocStatus = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setDocs((prev) =>
-      prev.map((d) => {
-        if (d.id !== id) return d;
-        const order: DocumentItem['status'][] = ['verified', 'pending', 'expired'];
-        const nextStatus = order[(order.indexOf(d.status) + 1) % order.length];
-        return { ...d, status: nextStatus };
-      })
-    );
+    cycleDocumentStatusStore(id);
   };
 
   // Open Add Modal
@@ -155,25 +90,7 @@ export default function DocumentsScreen() {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
     if (editingId) {
-      setDocs((prev) =>
-        prev.map((d) =>
-          d.id === editingId
-            ? {
-                ...d,
-                title: docTitle.trim(),
-                documentType: docType.trim() || 'Dokumen Persyaratan',
-                category: docCategory,
-                owner: docOwner,
-                issueDate: docIssueDate.trim() || undefined,
-                status: docStatus,
-                notes: docNotes.trim() || undefined,
-              }
-            : d
-        )
-      );
-    } else {
-      const newDoc: DocumentItem = {
-        id: Date.now().toString(),
+      updateDocumentStore(editingId, {
         title: docTitle.trim(),
         documentType: docType.trim() || 'Dokumen Persyaratan',
         category: docCategory,
@@ -181,8 +98,17 @@ export default function DocumentsScreen() {
         issueDate: docIssueDate.trim() || undefined,
         status: docStatus,
         notes: docNotes.trim() || undefined,
-      };
-      setDocs((prev) => [newDoc, ...prev]);
+      });
+    } else {
+      addDocumentStore({
+        title: docTitle.trim(),
+        documentType: docType.trim() || 'Dokumen Persyaratan',
+        category: docCategory,
+        owner: docOwner,
+        issueDate: docIssueDate.trim() || undefined,
+        status: docStatus,
+        notes: docNotes.trim() || undefined,
+      });
     }
     setModalVisible(false);
   };
@@ -191,7 +117,7 @@ export default function DocumentsScreen() {
   const handleDeleteDoc = () => {
     if (!editingId) return;
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setDocs((prev) => prev.filter((d) => d.id !== editingId));
+    deleteDocumentStore(editingId);
     setModalVisible(false);
   };
 

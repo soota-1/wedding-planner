@@ -24,47 +24,11 @@ import { SegmentedControl } from '../../src/components/common/SegmentedControl';
 import { FilterChipBar } from '../../src/components/common/FilterChipBar';
 import { ProgressBar } from '../../src/components/common/ProgressBar';
 import { FadeInView } from '../../src/components/common/FadeInView';
+import { useWeddingStore, GuestItem, GiftItem } from '../../src/stores/useWeddingStore';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
-
-interface GuestItem {
-  id: string;
-  name: string;
-  side: 'groom' | 'bride' | 'both';
-  groupTag: string;
-  estimatedPax: number;
-  actualPax: number;
-  rsvpStatus: 'attending' | 'declined' | 'tentative' | 'pending';
-}
-
-interface GiftItem {
-  id: string;
-  senderName: string;
-  giftType: 'cash' | 'transfer' | 'physical_gift';
-  amount: number;
-  giftDescription?: string;
-  receivedBy: 'groom' | 'bride' | 'both' | 'family_groom' | 'family_bride';
-  thankYouSent: boolean;
-}
-
-const initialGuests: GuestItem[] = [
-  { id: 'g1', name: 'Budi Santoso & Pasangan', side: 'groom', groupTag: 'Keluarga Inti', estimatedPax: 2, actualPax: 2, rsvpStatus: 'attending' },
-  { id: 'g2', name: 'Siti Rahma', side: 'groom', groupTag: 'Rekan Kerja', estimatedPax: 1, actualPax: 1, rsvpStatus: 'attending' },
-  { id: 'g3', name: 'Kel. Besar Hartono', side: 'bride', groupTag: 'VIP Keluarga', estimatedPax: 4, actualPax: 4, rsvpStatus: 'attending' },
-  { id: 'g4', name: 'Kevin & Fiona', side: 'bride', groupTag: 'Sahabat Kuliah', estimatedPax: 2, actualPax: 0, rsvpStatus: 'tentative' },
-  { id: 'g5', name: 'Joko Widodo', side: 'groom', groupTag: 'Kolega', estimatedPax: 1, actualPax: 0, rsvpStatus: 'declined' },
-  { id: 'g6', name: 'Alumni SMA Sanur', side: 'both', groupTag: 'Sahabat', estimatedPax: 5, actualPax: 0, rsvpStatus: 'pending' },
-];
-
-const initialGifts: GiftItem[] = [
-  { id: 'gf1', senderName: 'Om Anton', giftType: 'cash', amount: 5000000, receivedBy: 'groom', thankYouSent: true },
-  { id: 'gf2', senderName: 'Tante Rina', giftType: 'transfer', amount: 7500000, receivedBy: 'bride', thankYouSent: true },
-  { id: 'gf3', senderName: 'Direksi Perusahaan Octa', giftType: 'transfer', amount: 10000000, receivedBy: 'both', thankYouSent: false },
-  { id: 'gf4', senderName: 'Sahabat Kampus Jenesia', giftType: 'physical_gift', amount: 0, giftDescription: 'Espresso Coffee Machine DeLonghi', receivedBy: 'both', thankYouSent: true },
-  { id: 'gf5', senderName: 'Tetangga Komplek Solo', giftType: 'cash', amount: 1000000, receivedBy: 'family_groom', thankYouSent: false },
-];
 
 const sideOptions = ['Semua Pihak', 'Pihak Octa', 'Pihak Jenesia'];
 const sideKeys: ('all' | 'groom' | 'bride')[] = ['all', 'groom', 'bride'];
@@ -72,8 +36,17 @@ const sideKeys: ('all' | 'groom' | 'bride')[] = ['all', 'groom', 'bride'];
 export default function GuestsScreen() {
   const [activeSegmentIndex, setActiveSegmentIndex] = useState(0);
   const [sideIndex, setSideIndex] = useState(0);
-  const [guests, setGuests] = useState<GuestItem[]>(initialGuests);
-  const [gifts, setGifts] = useState<GiftItem[]>(initialGifts);
+
+  const guests = useWeddingStore((s) => s.guests);
+  const gifts = useWeddingStore((s) => s.gifts);
+  const cycleGuestRsvpStore = useWeddingStore((s) => s.cycleGuestRsvp);
+  const addGuestStore = useWeddingStore((s) => s.addGuest);
+  const updateGuestStore = useWeddingStore((s) => s.updateGuest);
+  const deleteGuestStore = useWeddingStore((s) => s.deleteGuest);
+  const toggleGiftThankYouStore = useWeddingStore((s) => s.toggleGiftThankYou);
+  const addGiftStore = useWeddingStore((s) => s.addGift);
+  const updateGiftStore = useWeddingStore((s) => s.updateGift);
+  const deleteGiftStore = useWeddingStore((s) => s.deleteGift);
 
   // Modals state
   const [modalType, setModalType] = useState<'guest' | 'gift' | null>(null);
@@ -97,26 +70,13 @@ export default function GuestsScreen() {
   // Quick cycle RSVP on single tap
   const cycleRsvp = (guestId: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setGuests((prev) =>
-      prev.map((g) => {
-        if (g.id !== guestId) return g;
-        const order: GuestItem['rsvpStatus'][] = ['attending', 'tentative', 'declined', 'pending'];
-        const nextStatus = order[(order.indexOf(g.rsvpStatus) + 1) % order.length];
-        return {
-          ...g,
-          rsvpStatus: nextStatus,
-          actualPax: nextStatus === 'attending' ? g.estimatedPax : 0,
-        };
-      })
-    );
+    cycleGuestRsvpStore(guestId);
   };
 
   // Quick toggle thank you note on single tap
   const toggleThankYou = (giftId: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setGifts((prev) =>
-      prev.map((gf) => (gf.id === giftId ? { ...gf, thankYouSent: !gf.thankYouSent } : gf))
-    );
+    toggleGiftThankYouStore(giftId);
   };
 
   // Open Add Modals
@@ -169,32 +129,23 @@ export default function GuestsScreen() {
     const pax = parseInt(guestPax.replace(/[^0-9]/g, ''), 10) || 1;
 
     if (editingId) {
-      setGuests((prev) =>
-        prev.map((g) =>
-          g.id === editingId
-            ? {
-                ...g,
-                name: guestName.trim(),
-                side: guestSide,
-                groupTag: guestGroup.trim() || 'Umum',
-                estimatedPax: pax,
-                actualPax: guestRsvp === 'attending' ? pax : 0,
-                rsvpStatus: guestRsvp,
-              }
-            : g
-        )
-      );
-    } else {
-      const newGuest: GuestItem = {
-        id: Date.now().toString(),
+      updateGuestStore(editingId, {
         name: guestName.trim(),
         side: guestSide,
         groupTag: guestGroup.trim() || 'Umum',
         estimatedPax: pax,
         actualPax: guestRsvp === 'attending' ? pax : 0,
         rsvpStatus: guestRsvp,
-      };
-      setGuests((prev) => [newGuest, ...prev]);
+      });
+    } else {
+      addGuestStore({
+        name: guestName.trim(),
+        side: guestSide,
+        groupTag: guestGroup.trim() || 'Umum',
+        estimatedPax: pax,
+        actualPax: guestRsvp === 'attending' ? pax : 0,
+        rsvpStatus: guestRsvp,
+      });
     }
     setModalType(null);
   };
@@ -205,32 +156,23 @@ export default function GuestsScreen() {
     const amount = parseInt(giftAmount.replace(/[^0-9]/g, ''), 10) || 0;
 
     if (editingId) {
-      setGifts((prev) =>
-        prev.map((gf) =>
-          gf.id === editingId
-            ? {
-                ...gf,
-                senderName: giftSender.trim(),
-                giftType,
-                amount: giftType === 'physical_gift' ? 0 : amount,
-                giftDescription: giftType === 'physical_gift' ? giftDesc.trim() || 'Kado Fisik' : undefined,
-                receivedBy: giftReceiver,
-                thankYouSent: giftThankYou,
-              }
-            : gf
-        )
-      );
-    } else {
-      const newGift: GiftItem = {
-        id: Date.now().toString(),
+      updateGiftStore(editingId, {
         senderName: giftSender.trim(),
         giftType,
         amount: giftType === 'physical_gift' ? 0 : amount,
         giftDescription: giftType === 'physical_gift' ? giftDesc.trim() || 'Kado Fisik' : undefined,
         receivedBy: giftReceiver,
         thankYouSent: giftThankYou,
-      };
-      setGifts((prev) => [newGift, ...prev]);
+      });
+    } else {
+      addGiftStore({
+        senderName: giftSender.trim(),
+        giftType,
+        amount: giftType === 'physical_gift' ? 0 : amount,
+        giftDescription: giftType === 'physical_gift' ? giftDesc.trim() || 'Kado Fisik' : undefined,
+        receivedBy: giftReceiver,
+        thankYouSent: giftThankYou,
+      });
     }
     setModalType(null);
   };
@@ -240,9 +182,9 @@ export default function GuestsScreen() {
     if (!editingId) return;
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     if (modalType === 'guest') {
-      setGuests((prev) => prev.filter((g) => g.id !== editingId));
+      deleteGuestStore(editingId);
     } else if (modalType === 'gift') {
-      setGifts((prev) => prev.filter((gf) => gf.id !== editingId));
+      deleteGiftStore(editingId);
     }
     setModalType(null);
   };

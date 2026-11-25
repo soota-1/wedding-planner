@@ -23,65 +23,33 @@ import { Badge } from '../../src/components/common/Badge';
 import { ProgressBar } from '../../src/components/common/ProgressBar';
 import { SegmentedControl } from '../../src/components/common/SegmentedControl';
 import { FadeInView } from '../../src/components/common/FadeInView';
+import {
+  useWeddingStore,
+  CategoryItem,
+  VendorItem,
+  TransactionItem,
+} from '../../src/stores/useWeddingStore';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-interface CategoryItem {
-  id: string;
-  name: string;
-  allocated: number;
-  committed: number;
-}
-
-interface VendorItem {
-  id: string;
-  name: string;
-  category: string;
-  contractValue: number;
-  status: 'researching' | 'shortlisted' | 'booked' | 'completed';
-  contactPerson: string;
-}
-
-interface TransactionItem {
-  id: string;
-  vendorName: string;
-  amount: number;
-  paidBy: 'groom' | 'bride' | 'family';
-  status: 'paid' | 'pending';
-  date: string;
-  notes: string;
-}
-
-const initialCategories: CategoryItem[] = [
-  { id: '1', name: 'Venue & Gedung Resepsi', allocated: 50000000, committed: 50000000 },
-  { id: '2', name: 'Katering Mawar (800 Porsi)', allocated: 70000000, committed: 80000000 },
-  { id: '3', name: 'Dokumentasi Foto & Video', allocated: 20000000, committed: 28000000 },
-  { id: '4', name: 'Busana Pengantin & MUA', allocated: 10000000, committed: 0 },
-];
-
-const initialVendors: VendorItem[] = [
-  { id: 'v1', name: 'Gedung Paroki St. Perawan Maria', category: 'Venue', contractValue: 50000000, status: 'booked', contactPerson: 'Ibu Marta' },
-  { id: 'v2', name: 'Katering Selera Nusantara', category: 'Katering', contractValue: 80000000, status: 'booked', contactPerson: 'Pak Hendra' },
-  { id: 'v3', name: 'Atelier Wedding Photography', category: 'Dokumentasi', contractValue: 28000000, status: 'booked', contactPerson: 'David' },
-  { id: 'v4', name: 'Sanggar Rias & Gaun Pengantin', category: 'Busana', contractValue: 15000000, status: 'shortlisted', contactPerson: 'Cindy' },
-];
-
-const initialTransactions: TransactionItem[] = [
-  { id: 'tx1', vendorName: 'Gedung Paroki St. Perawan Maria', amount: 10000000, paidBy: 'groom', status: 'paid', date: '10 Feb 2027', notes: 'Booking Fee Gedung' },
-  { id: 'tx2', vendorName: 'Katering Selera Nusantara', amount: 20000000, paidBy: 'bride', status: 'paid', date: '01 Mar 2027', notes: 'DP 25% Prasmanan' },
-  { id: 'tx3', vendorName: 'Atelier Wedding Photography', amount: 5000000, paidBy: 'family', status: 'paid', date: '15 Mar 2027', notes: 'DP Liputan Misa' },
-  { id: 'tx4', vendorName: 'Katering Selera Nusantara', amount: 30000000, paidBy: 'bride', status: 'pending', date: '01 Sep 2027', notes: 'Termin Cicilan 2' },
-];
-
 export default function BudgetScreen() {
   const [activeTab, setActiveTab] = useState(0);
 
-  // Entities state
-  const [categories, setCategories] = useState<CategoryItem[]>(initialCategories);
-  const [vendors, setVendors] = useState<VendorItem[]>(initialVendors);
-  const [transactions, setTransactions] = useState<TransactionItem[]>(initialTransactions);
+  // Store state & actions
+  const categories = useWeddingStore((s) => s.categories);
+  const vendors = useWeddingStore((s) => s.vendors);
+  const transactions = useWeddingStore((s) => s.transactions);
+  const addCategory = useWeddingStore((s) => s.addCategory);
+  const updateCategory = useWeddingStore((s) => s.updateCategory);
+  const deleteCategory = useWeddingStore((s) => s.deleteCategory);
+  const addVendor = useWeddingStore((s) => s.addVendor);
+  const updateVendor = useWeddingStore((s) => s.updateVendor);
+  const deleteVendor = useWeddingStore((s) => s.deleteVendor);
+  const addTransaction = useWeddingStore((s) => s.addTransaction);
+  const updateTransaction = useWeddingStore((s) => s.updateTransaction);
+  const deleteTransaction = useWeddingStore((s) => s.deleteTransaction);
 
   // Modals state
   const [modalType, setModalType] = useState<'category' | 'vendor' | 'transaction' | null>(null);
@@ -171,19 +139,9 @@ export default function BudgetScreen() {
     const comm = parseInt(catCommitted.replace(/[^0-9]/g, ''), 10) || 0;
 
     if (editingId) {
-      setCategories((prev) =>
-        prev.map((c) =>
-          c.id === editingId ? { ...c, name: catName.trim(), allocated: alloc, committed: comm } : c
-        )
-      );
+      updateCategory(editingId, { name: catName.trim(), allocated: alloc, committed: comm });
     } else {
-      const newCat: CategoryItem = {
-        id: Date.now().toString(),
-        name: catName.trim(),
-        allocated: alloc,
-        committed: comm,
-      };
-      setCategories((prev) => [...prev, newCat]);
+      addCategory({ name: catName.trim(), allocated: alloc, committed: comm });
     }
     setModalType(null);
   };
@@ -194,30 +152,21 @@ export default function BudgetScreen() {
     const contract = parseInt(vendorContract.replace(/[^0-9]/g, ''), 10) || 0;
 
     if (editingId) {
-      setVendors((prev) =>
-        prev.map((v) =>
-          v.id === editingId
-            ? {
-                ...v,
-                name: vendorName.trim(),
-                category: vendorCategory.trim() || 'Lainnya',
-                contractValue: contract,
-                status: vendorStatus,
-                contactPerson: vendorContact.trim() || 'PIC',
-              }
-            : v
-        )
-      );
-    } else {
-      const newVendor: VendorItem = {
-        id: Date.now().toString(),
+      updateVendor(editingId, {
         name: vendorName.trim(),
         category: vendorCategory.trim() || 'Lainnya',
         contractValue: contract,
         status: vendorStatus,
         contactPerson: vendorContact.trim() || 'PIC',
-      };
-      setVendors((prev) => [...prev, newVendor]);
+      });
+    } else {
+      addVendor({
+        name: vendorName.trim(),
+        category: vendorCategory.trim() || 'Lainnya',
+        contractValue: contract,
+        status: vendorStatus,
+        contactPerson: vendorContact.trim() || 'PIC',
+      });
     }
     setModalType(null);
   };
@@ -228,32 +177,23 @@ export default function BudgetScreen() {
     const amount = parseInt(txAmount.replace(/[^0-9]/g, ''), 10) || 0;
 
     if (editingId) {
-      setTransactions((prev) =>
-        prev.map((tx) =>
-          tx.id === editingId
-            ? {
-                ...tx,
-                notes: txNotes.trim(),
-                vendorName: txVendor.trim() || 'Vendor',
-                amount,
-                paidBy: txPaidBy,
-                status: txStatus,
-                date: txDate.trim() || 'Hari ini',
-              }
-            : tx
-        )
-      );
-    } else {
-      const newTx: TransactionItem = {
-        id: Date.now().toString(),
+      updateTransaction(editingId, {
         notes: txNotes.trim(),
         vendorName: txVendor.trim() || 'Vendor',
         amount,
         paidBy: txPaidBy,
         status: txStatus,
         date: txDate.trim() || 'Hari ini',
-      };
-      setTransactions((prev) => [newTx, ...prev]);
+      });
+    } else {
+      addTransaction({
+        notes: txNotes.trim(),
+        vendorName: txVendor.trim() || 'Vendor',
+        amount,
+        paidBy: txPaidBy,
+        status: txStatus,
+        date: txDate.trim() || 'Hari ini',
+      });
     }
     setModalType(null);
   };
@@ -263,11 +203,11 @@ export default function BudgetScreen() {
     if (!editingId) return;
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     if (modalType === 'category') {
-      setCategories((prev) => prev.filter((c) => c.id !== editingId));
+      deleteCategory(editingId);
     } else if (modalType === 'vendor') {
-      setVendors((prev) => prev.filter((v) => v.id !== editingId));
+      deleteVendor(editingId);
     } else if (modalType === 'transaction') {
-      setTransactions((prev) => prev.filter((tx) => tx.id !== editingId));
+      deleteTransaction(editingId);
     }
     setModalType(null);
   };

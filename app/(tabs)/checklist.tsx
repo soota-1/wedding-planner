@@ -22,39 +22,17 @@ import { Header } from '../../src/components/common/Header';
 import { Badge } from '../../src/components/common/Badge';
 import { ProgressBar } from '../../src/components/common/ProgressBar';
 import { FilterChipBar } from '../../src/components/common/FilterChipBar';
+import {
+  useWeddingStore,
+  ChecklistItem,
+  TaskCategory,
+  TaskPriority,
+  TaskPic,
+} from '../../src/stores/useWeddingStore';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
-
-type TaskCategory = 'canonical' | 'civil' | 'liturgy' | 'vendor';
-type TaskPriority = 'critical' | 'high' | 'medium' | 'low';
-type TaskPic = 'groom' | 'bride' | 'both';
-
-interface ChecklistItem {
-  id: string;
-  title: string;
-  category: TaskCategory;
-  dueDate: string;
-  offsetDays: number;
-  priority: TaskPriority;
-  pic: TaskPic;
-  completed: boolean;
-}
-
-const WEDDING_DATE = new Date('2027-10-10T00:00:00.000Z');
-
-const initialTasks: ChecklistItem[] = [
-  { id: '1', title: 'Kursus Persiapan Perkawinan (KPP)', category: 'canonical', dueDate: '13 Apr 2027', offsetDays: -180, priority: 'critical', pic: 'both', completed: true },
-  { id: '2', title: 'Pengurusan Surat Baptis Terbaru', category: 'canonical', dueDate: '13 Mei 2027', offsetDays: -150, priority: 'high', pic: 'both', completed: false },
-  { id: '3', title: 'Penyelidikan Kanonik Pastor Paroki', category: 'canonical', dueDate: '12 Jul 2027', offsetDays: -90, priority: 'critical', pic: 'both', completed: false },
-  { id: '4', title: 'Berkas Disdukcapil & Formulir N1-N4', category: 'civil', dueDate: '11 Agu 2027', offsetDays: -60, priority: 'high', pic: 'both', completed: false },
-  { id: '5', title: 'Penentuan Saksi Nikah Resmi Gereja', category: 'canonical', dueDate: '11 Agu 2027', offsetDays: -60, priority: 'medium', pic: 'both', completed: false },
-  { id: '6', title: 'Teks Liturgi & Buku Panduan Misa', category: 'liturgy', dueDate: '10 Sep 2027', offsetDays: -30, priority: 'medium', pic: 'groom', completed: false },
-  { id: '7', title: 'Finalisasi Porsi Katering & Rundown', category: 'vendor', dueDate: '26 Sep 2027', offsetDays: -14, priority: 'high', pic: 'bride', completed: false },
-  { id: '8', title: 'Gladi Bersih Liturgi Gereja', category: 'liturgy', dueDate: '05 Okt 2027', offsetDays: -5, priority: 'high', pic: 'both', completed: false },
-  { id: '9', title: 'Sakramen Tobat Calon Mempelai', category: 'canonical', dueDate: '08 Okt 2027', offsetDays: -2, priority: 'critical', pic: 'both', completed: false },
-];
 
 const categoryLabels = ['Semua', 'Kanonik & KPP', 'Sipil', 'Liturgi', 'Vendor'];
 const categoryKeys = ['all', 'canonical', 'civil', 'liturgy', 'vendor'];
@@ -89,7 +67,13 @@ const datePresets = [
 export default function ChecklistScreen() {
   const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-  const [tasks, setTasks] = useState<ChecklistItem[]>(initialTasks);
+
+  const weddingDateIso = useWeddingStore((s) => s.profile.weddingDate);
+  const tasks = useWeddingStore((s) => s.tasks);
+  const toggleTaskStore = useWeddingStore((s) => s.toggleTask);
+  const addTaskStore = useWeddingStore((s) => s.addTask);
+  const updateTaskStore = useWeddingStore((s) => s.updateTask);
+  const deleteTaskStore = useWeddingStore((s) => s.deleteTask);
 
   // Modal Form State (supports both Add and Edit)
   const [modalVisible, setModalVisible] = useState(false);
@@ -107,7 +91,9 @@ export default function ChecklistScreen() {
     setFormCategory('canonical');
     setFormPriority('medium');
     setFormPic('both');
-    setFormDueDate('10 Sep 2027');
+    const baseDate = new Date(weddingDateIso);
+    const defaultDate = !isNaN(baseDate.getTime()) ? format(subDays(baseDate, 30), 'dd MMM yyyy') : '10 Sep 2027';
+    setFormDueDate(defaultDate);
     setFormOffsetDays(-30);
     setModalVisible(true);
   };
@@ -124,16 +110,16 @@ export default function ChecklistScreen() {
   };
 
   const applyDatePreset = (offset: number) => {
-    const targetDate = subDays(WEDDING_DATE, Math.abs(offset));
+    const baseDate = new Date(weddingDateIso);
+    const safeDate = !isNaN(baseDate.getTime()) ? baseDate : new Date('2027-10-10T00:00:00.000Z');
+    const targetDate = subDays(safeDate, Math.abs(offset));
     setFormOffsetDays(offset);
     setFormDueDate(format(targetDate, 'dd MMM yyyy'));
   };
 
   const toggleTask = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
-    );
+    toggleTaskStore(id);
   };
 
   const handleSaveTask = () => {
@@ -142,24 +128,16 @@ export default function ChecklistScreen() {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
     if (editingTaskId) {
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === editingTaskId
-            ? {
-                ...t,
-                title: trimmed,
-                category: formCategory,
-                priority: formPriority,
-                pic: formPic,
-                dueDate: formDueDate.trim() || t.dueDate,
-                offsetDays: formOffsetDays,
-              }
-            : t
-        )
-      );
+      updateTaskStore(editingTaskId, {
+        title: trimmed,
+        category: formCategory,
+        priority: formPriority,
+        pic: formPic,
+        dueDate: formDueDate.trim() || 'Segera',
+        offsetDays: formOffsetDays,
+      });
     } else {
-      const created: ChecklistItem = {
-        id: Date.now().toString(),
+      addTaskStore({
         title: trimmed,
         category: formCategory,
         dueDate: formDueDate.trim() || 'Segera',
@@ -167,8 +145,7 @@ export default function ChecklistScreen() {
         priority: formPriority,
         pic: formPic,
         completed: false,
-      };
-      setTasks((prev) => [created, ...prev]);
+      });
     }
 
     setModalVisible(false);
@@ -177,7 +154,7 @@ export default function ChecklistScreen() {
   const handleDeleteTask = () => {
     if (!editingTaskId) return;
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setTasks((prev) => prev.filter((t) => t.id !== editingTaskId));
+    deleteTaskStore(editingTaskId);
     setModalVisible(false);
   };
 
