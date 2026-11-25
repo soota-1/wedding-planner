@@ -143,15 +143,26 @@ export default function TimelineScreen() {
         isCompleted: e.isCompleted,
       }));
 
-    const scheduled = await NotificationService.scheduleUpcomingReminders(
-      calendarEvents,
-      async (payload) => `local-${payload.data?.eventId}`
-    );
+    try {
+      const scheduled = await NotificationService.scheduleUpcomingReminders(
+        calendarEvents,
+        (payload) => NotificationService.scheduleLocalNotification(payload)
+      );
 
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setReminderStatus(
+        `${scheduled.length} pengingat agenda & termin cicilan berhasil dijadwalkan di perangkat Anda.`
+      );
+    } catch (err: any) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setReminderStatus(err?.message || 'Gagal menjadwalkan pengingat di perangkat.');
+    }
+  };
+
+  const handleTestNotification = async () => {
+    const res = await NotificationService.sendTestNotification(3);
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setReminderStatus(
-      `${scheduled.length} pengingat agenda & termin cicilan siap dijadwalkan untuk perangkat Anda.`
-    );
+    setReminderStatus(res.message);
   };
 
   return (
@@ -193,14 +204,29 @@ export default function TimelineScreen() {
                 </Text>
               </View>
             </View>
-            <TouchableOpacity
-              onPress={handleScheduleReminders}
-              activeOpacity={0.8}
-              style={styles.reminderButton}
-            >
-              <Ionicons name="alarm-outline" size={15} color={colors.textLight} />
-              <Text style={styles.reminderButtonText}>Siapkan Pengingat Agenda</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                onPress={handleScheduleReminders}
+                activeOpacity={0.8}
+                style={[styles.reminderButton, { flex: 1 }]}
+              >
+                <Ionicons name="alarm-outline" size={15} color={colors.textLight} />
+                <Text style={styles.reminderButtonText}>Aktifkan Semua Pengingat</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleTestNotification}
+                activeOpacity={0.8}
+                style={[
+                  styles.reminderButton,
+                  { backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.accent },
+                ]}
+              >
+                <Ionicons name="notifications-outline" size={15} color={colors.accent} />
+                <Text style={[styles.reminderButtonText, { color: colors.accent }]}>
+                  Tes 3 dtk
+                </Text>
+              </TouchableOpacity>
+            </View>
           </Card>
         </FadeInView>
 

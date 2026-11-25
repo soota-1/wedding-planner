@@ -84,4 +84,10 @@ describe('NotificationService scheduling', () => {
       })
     );
   });
+
+  it('triggers sendTestNotification using expo-notifications', async () => {
+    const res = await NotificationService.sendTestNotification(3);
+    expect(res.ok).toBe(true);
+    expect(res.message).toContain('3 detik');
+  });
 });

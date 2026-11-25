@@ -948,13 +948,26 @@ export default function BudgetScreen() {
                 <View style={styles.detailCardBox}>
                   <View style={styles.rowBetween}>
                     <Text style={styles.detailCardLabel}>Jadwal Meeting & Fitting</Text>
-                    <TouchableOpacity
-                      onPress={() => setShowAddScheduleRow((v) => !v)}
-                      style={styles.addScheduleLink}
-                    >
-                      <Ionicons name="add-circle-outline" size={16} color={colors.accent} />
-                      <Text style={styles.addScheduleLinkText}>Tambah Jadwal</Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <TouchableOpacity
+                        onPress={async () => {
+                          const res = await NotificationService.sendTestNotification(3);
+                          Alert.alert(res.ok ? 'Tes Notifikasi' : 'Izin Diperlukan', res.message);
+                        }}
+                        style={styles.testNotifPill}
+                        activeOpacity={0.75}
+                      >
+                        <Ionicons name="notifications-outline" size={13} color={colors.accent} />
+                        <Text style={styles.testNotifPillText}>Tes Notif</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => setShowAddScheduleRow((v) => !v)}
+                        style={styles.addScheduleLink}
+                      >
+                        <Ionicons name="add-circle-outline" size={16} color={colors.accent} />
+                        <Text style={styles.addScheduleLinkText}>Tambah</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
 
                   {/* Inline Form Tambah Jadwal (Kalender + Jam + Pengingat) */}
@@ -1794,6 +1807,20 @@ const styles = StyleSheet.create({
   },
   scheduleReminderPillText: {
     fontSize: 10,
+    fontWeight: '600',
+    color: colors.accent,
+  },
+  testNotifPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: `${colors.accent}15`,
+  },
+  testNotifPillText: {
+    fontSize: 11,
     fontWeight: '600',
     color: colors.accent,
   },

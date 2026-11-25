@@ -1,4 +1,20 @@
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 import { CalendarEvent, NotificationPayload } from '../types/calendar';
+
+try {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+} catch {
+  // Ignore in non-native environments
+}
 
 export function mapEventsForTimeline(
   tasks: Array<{ id: string; title: string; dueDate?: Date | string | null; status?: string }>,
@@ -76,6 +92,100 @@ export function formatReminderLeadTime(minutesBefore?: number): string {
 }
 
 export class NotificationService {
+  static async ensurePermissionsAndChannel(): Promise<boolean> {
+    try {
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('wedding-reminders', {
+          name: 'Pengingat Pernikahan',
+          importance: Notifications.AndroidImportance.HIGH,
+          sound: 'default',
+          vibrationPattern: [0, 250, 250, 250],
+        });
+      }
+
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      return finalStatus === 'granted';
+    } catch {
+      return false;
+    }
+  }
+
+  static async scheduleLocalNotification(payload: NotificationPayload): Promise<string> {
+    const granted = await this.ensurePermissionsAndChannel();
+    if (!granted) {
+      throw new Error('Izin notifikasi belum diberikan pada perangkat ini.');
+    }
+
+    const nowMs = Date.now();
+    const diffSeconds = Math.floor((payload.triggerDate.getTime() - nowMs) / 1000);
+
+    const trigger: Notifications.NotificationTriggerInput =
+      diffSeconds <= 5
+        ? {
+            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+            seconds: 3,
+            channelId: 'wedding-reminders',
+          }
+        : {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: payload.triggerDate,
+            channelId: 'wedding-reminders',
+          };
+
+    return await Notifications.scheduleNotificationAsync({
+      content: {
+        title: payload.title,
+        body: payload.body,
+        data: payload.data || {},
+        sound: true,
+      },
+      trigger,
+    });
+  }
+
+  static async sendTestNotification(
+    delaySeconds: number = 3
+  ): Promise<{ ok: boolean; message: string }> {
+    try {
+      const granted = await this.ensurePermissionsAndChannel();
+      if (!granted) {
+        return {
+          ok: false,
+          message: 'Izin notifikasi ditolak. Aktifkan izin notifikasi di Pengaturan HP Anda.',
+        };
+      }
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '💍 Uji Pengingat Wedding Tracker',
+          body: 'Notifikasi lokal berhasil aktif! Pengingat jadwal vendor & checklist siap berjalan.',
+          sound: true,
+          data: { type: 'test' },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: Math.max(1, delaySeconds),
+          channelId: 'wedding-reminders',
+        },
+      });
+
+      return {
+        ok: true,
+        message: `Notifikasi uji coba akan muncul dalam ${delaySeconds} detik.`,
+      };
+    } catch (err: any) {
+      return {
+        ok: false,
+        message: err?.message || 'Gagal menjadwalkan notifikasi uji coba.',
+      };
+    }
+  }
+
   static async scheduleUpcomingReminders(
     events: CalendarEvent[],
     scheduler?: (payload: NotificationPayload) => Promise<string>
@@ -145,6 +255,12 @@ export class NotificationService {
 
     if (scheduler) {
       await scheduler(payload);
+    } else {
+      try {
+        await this.scheduleLocalNotification(payload);
+      } catch {
+        // Fallback silently if permissions denied or running headless
+      }
     }
 
     return {

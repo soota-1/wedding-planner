@@ -94,6 +94,18 @@ jest.mock('@expo/vector-icons', () => ({
     reactModule.createElement('Feather', { name, size, color, ...props }),
 }));
 
+// Expo Notifications Mock for Jest
+jest.mock('expo-notifications', () => ({
+  setNotificationHandler: jest.fn(),
+  getPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+  requestPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+  setNotificationChannelAsync: jest.fn().mockResolvedValue(null),
+  scheduleNotificationAsync: jest.fn().mockResolvedValue('mock-notif-id'),
+  cancelScheduledNotificationAsync: jest.fn().mockResolvedValue(undefined),
+  AndroidImportance: { MAX: 5, HIGH: 4, DEFAULT: 3 },
+  SchedulableTriggerInputTypes: { DATE: 'date', TIME_INTERVAL: 'timeInterval' },
+}));
+
 // Expo Router Mocks for Jest
 jest.mock('expo-router', () => ({
   useRouter: () => ({
