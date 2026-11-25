@@ -144,6 +144,13 @@ jest.mock('expo-file-system', () => ({
   EncodingType: { Base64: 'base64' },
 }));
 
+jest.mock('expo-file-system/legacy', () => ({
+  cacheDirectory: 'file:///mock-cache/',
+  downloadAsync: jest.fn().mockResolvedValue({ uri: 'file:///mock-cache/downloaded.jpg' }),
+  readAsStringAsync: jest.fn().mockResolvedValue('bW9jay1iYXNlNjQ='),
+  EncodingType: { Base64: 'base64' },
+}));
+
 jest.mock('expo-clipboard', () => ({
   setStringAsync: jest.fn().mockResolvedValue(true),
 }));
