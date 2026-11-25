@@ -108,6 +108,23 @@ export interface DocumentItem {
   notes?: string;
 }
 
+export type MoodboardCategory = 'decor' | 'attire' | 'makeup' | 'photo' | 'other';
+
+export interface MoodboardItem {
+  id: string;
+  title: string;
+  category: MoodboardCategory;
+  imageUrl?: string;
+  storagePath?: string;
+  referenceUrl?: string;
+  colorPalette: string[];
+  notes?: string;
+  vendorId?: string;
+  isFinal: boolean;
+  createdBy?: 'groom' | 'bride';
+  createdAt: string;
+}
+
 export interface WeddingProfile {
   groomName: string;
   brideName: string;

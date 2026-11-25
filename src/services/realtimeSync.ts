@@ -31,6 +31,7 @@ export function subscribeToWorkspaceChanges(
     'guests',
     'gifts',
     'wedding_documents',
+    'moodboard_items',
   ];
 
   childTables.forEach((table) => {

@@ -105,4 +105,99 @@ describe('CloudSyncService (Phase 5 & 6A)', () => {
     expect(snapshot.guests.length).toBe(1);
     expect(snapshot.documents.length).toBe(1);
   });
+
+  it('pulls moodboard_items with colorPalette, vendorId, and isFinal in pullWorkspaceSnapshot', async () => {
+    const mockOrder = jest.fn().mockResolvedValue({
+      data: [
+        {
+          id: '11111111-1111-1111-1111-111111111111',
+          title: 'Pelaminan Minimalis',
+          category: 'decor',
+          image_url: 'https://cdn.example.com/decor.jpg',
+          storage_path: 'ws-123/11111111-1111-1111-1111-111111111111.jpg',
+          reference_url: 'https://pinterest.com/pin/123',
+          color_palette: ['#F8F7F4', '#9E5A47'],
+          notes: 'Bunga putih + daun olive',
+          vendor_id: 'v1',
+          is_final: true,
+          created_by: 'bride',
+          created_at: '2026-11-25T10:00:00.000Z',
+        },
+      ],
+      error: null,
+    });
+    const mockEq = jest.fn(() => {
+      const p: any = Promise.resolve({ data: [], error: null });
+      p.single = jest.fn().mockResolvedValue({
+        data: { id: 'ws-123', wedding_date: '2027-10-10' },
+        error: null,
+      });
+      p.order = mockOrder;
+      return p;
+    });
+    const mockSelect = jest.fn(() => ({ eq: mockEq }));
+    jest.spyOn(supabase, 'from').mockReturnValue({ select: mockSelect } as any);
+
+    const snapshot = await CloudSyncService.pullWorkspaceSnapshot('ws-123');
+    expect(snapshot.moodboardItems.length).toBe(1);
+    expect(snapshot.moodboardItems[0]).toMatchObject({
+      title: 'Pelaminan Minimalis',
+      category: 'decor',
+      colorPalette: ['#F8F7F4', '#9E5A47'],
+      vendorId: 'v1',
+      isFinal: true,
+    });
+  });
+
+  it('throws clear online-required error when pushing or deleting moodboard item offline', async () => {
+    await expect(
+      CloudSyncService.pushMoodboardItem({
+        id: '11111111-1111-1111-1111-111111111111',
+        title: 'Dekorasi Altar',
+        category: 'decor',
+        referenceUrl: 'https://instagram.com/p/abc',
+        colorPalette: ['#9E5A47'],
+        isFinal: false,
+        createdAt: '2026-11-25T10:00:00.000Z',
+      })
+    ).rejects.toThrow(/Nyalakan data seluler atau Wi-Fi/i);
+
+    await expect(
+      CloudSyncService.deleteMoodboardItem('11111111-1111-1111-1111-111111111111')
+    ).rejects.toThrow(/Nyalakan data seluler atau Wi-Fi/i);
+  });
+
+  it('uploads moodboard image to Supabase Storage bucket moodboard-assets', async () => {
+    const prevUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    const prevKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+    process.env.EXPO_PUBLIC_SUPABASE_URL = 'https://real-project.supabase.co';
+    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY = 'real-anon-key-123456';
+
+    try {
+      useAuthStore.getState().setUser({ id: 'u1', email: 'jenesia23@gmail.com' } as any);
+      useAuthStore.getState().setActiveWorkspace({
+        id: '33333333-3333-3333-3333-333333333333',
+        name: 'Octa & Jenesia',
+        wedding_date: '2027-10-10',
+        religion_template: 'catholic',
+      });
+
+      const mockUpload = jest.fn().mockResolvedValue({ data: { path: '33333333-3333-3333-3333-333333333333/item-1.jpg' }, error: null });
+      const mockGetPublicUrl = jest.fn().mockReturnValue({
+        data: { publicUrl: 'https://real-project.supabase.co/storage/v1/object/public/moodboard-assets/33333333-3333-3333-3333-333333333333/item-1.jpg' },
+      });
+      jest.spyOn(supabase.storage, 'from').mockReturnValue({
+        upload: mockUpload,
+        getPublicUrl: mockGetPublicUrl,
+      } as any);
+
+      const res = await CloudSyncService.uploadMoodboardImage('file:///photo.jpg', 'item-1');
+      expect(mockUpload).toHaveBeenCalled();
+      expect(res.storagePath).toBe('33333333-3333-3333-3333-333333333333/item-1.jpg');
+      expect(res.imageUrl).toContain('moodboard-assets');
+    } finally {
+      process.env.EXPO_PUBLIC_SUPABASE_URL = prevUrl;
+      process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY = prevKey;
+    }
+  });
 });

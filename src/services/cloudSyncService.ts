@@ -1,4 +1,5 @@
 import { format, parseISO, isValid } from 'date-fns';
+import * as FileSystem from 'expo-file-system';
 import { supabase } from '../config/supabase';
 import { useAuthStore, Workspace } from '../stores/useAuthStore';
 import { subscribeToWorkspaceChanges } from './realtimeSync';
@@ -11,7 +12,38 @@ import type {
   GuestItem,
   GiftItem,
   DocumentItem,
+  MoodboardItem,
 } from '../stores/useWeddingStore';
+
+const ONLINE_REQUIRED_MSG =
+  'Koneksi Internet Diperlukan: Nyalakan data seluler atau Wi-Fi untuk mengakses & menyinkronkan moodboard online.';
+
+function base64ToUint8Array(base64: string): Uint8Array {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const clean = base64.replace(/[^A-Za-z0-9+/=]/g, '');
+  const len = clean.length;
+  let bufferLength = Math.floor((len * 3) / 4);
+  if (clean[len - 1] === '=') bufferLength--;
+  if (clean[len - 2] === '=') bufferLength--;
+
+  const bytes = new Uint8Array(bufferLength);
+  let p = 0;
+  for (let i = 0; i < len; i += 4) {
+    const encoded1 = chars.indexOf(clean[i]);
+    const encoded2 = chars.indexOf(clean[i + 1]);
+    const encoded3 = chars.indexOf(clean[i + 2]);
+    const encoded4 = chars.indexOf(clean[i + 3]);
+
+    bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
+    if (encoded3 !== 64 && clean[i + 2] !== '=') {
+      bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
+    }
+    if (encoded4 !== 64 && clean[i + 3] !== '=') {
+      bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
+    }
+  }
+  return bytes;
+}
 
 export interface SyncResult {
   synced: boolean;
@@ -96,18 +128,37 @@ export class CloudSyncService {
   }
 
   static async pullWorkspaceSnapshot(workspaceId: string) {
-    const [wsRes, tasksRes, taskCatsRes, catsRes, vendorsRes, txRes, guestsRes, giftsRes, docsRes] =
-      await Promise.all([
-        supabase.from('workspaces').select('*').eq('id', workspaceId).single(),
-        supabase.from('tasks').select('*').eq('workspace_id', workspaceId),
-        supabase.from('checklist_categories').select('*').eq('workspace_id', workspaceId).order('sort_order', { ascending: true }),
-        supabase.from('budget_categories').select('*').eq('workspace_id', workspaceId),
-        supabase.from('vendors').select('*').eq('workspace_id', workspaceId),
-        supabase.from('transactions').select('*').eq('workspace_id', workspaceId),
-        supabase.from('guests').select('*').eq('workspace_id', workspaceId),
-        supabase.from('gifts').select('*').eq('workspace_id', workspaceId),
-        supabase.from('wedding_documents').select('*').eq('workspace_id', workspaceId),
-      ]);
+    const [
+      wsRes,
+      tasksRes,
+      taskCatsRes,
+      catsRes,
+      vendorsRes,
+      txRes,
+      guestsRes,
+      giftsRes,
+      docsRes,
+      moodboardRes,
+    ] = await Promise.all([
+      supabase.from('workspaces').select('*').eq('id', workspaceId).single(),
+      supabase.from('tasks').select('*').eq('workspace_id', workspaceId),
+      supabase
+        .from('checklist_categories')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .order('sort_order', { ascending: true }),
+      supabase.from('budget_categories').select('*').eq('workspace_id', workspaceId),
+      supabase.from('vendors').select('*').eq('workspace_id', workspaceId),
+      supabase.from('transactions').select('*').eq('workspace_id', workspaceId),
+      supabase.from('guests').select('*').eq('workspace_id', workspaceId),
+      supabase.from('gifts').select('*').eq('workspace_id', workspaceId),
+      supabase.from('wedding_documents').select('*').eq('workspace_id', workspaceId),
+      supabase
+        .from('moodboard_items')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .order('created_at', { ascending: false }),
+    ]);
 
     const mappedTaskCategories: TaskCategoryItem[] = (taskCatsRes.data || []).map((c: any) => ({
       id: c.id,
@@ -221,6 +272,21 @@ export class CloudSyncService {
       notes: d.notes || undefined,
     }));
 
+    const mappedMoodboard: MoodboardItem[] = (moodboardRes.data || []).map((m: any) => ({
+      id: m.id,
+      title: m.title,
+      category: m.category || 'other',
+      imageUrl: m.image_url || undefined,
+      storagePath: m.storage_path || undefined,
+      referenceUrl: m.reference_url || undefined,
+      colorPalette: Array.isArray(m.color_palette) ? m.color_palette : [],
+      notes: m.notes || undefined,
+      vendorId: m.vendor_id || undefined,
+      isFinal: !!m.is_final,
+      createdBy: m.created_by === 'groom' || m.created_by === 'bride' ? m.created_by : undefined,
+      createdAt: m.created_at || new Date().toISOString(),
+    }));
+
     return {
       workspace: wsRes.data || null,
       taskCategories: mappedTaskCategories,
@@ -231,6 +297,7 @@ export class CloudSyncService {
       guests: mappedGuests,
       gifts: mappedGifts,
       documents: mappedDocuments,
+      moodboardItems: mappedMoodboard,
     };
   }
 
@@ -478,6 +545,99 @@ export class CloudSyncService {
       .delete()
       .eq('id', id)
       .eq('workspace_id', ctx.workspaceId);
+  }
+
+  static async uploadMoodboardImage(
+    localUri: string,
+    itemId: string
+  ): Promise<{ imageUrl: string; storagePath: string }> {
+    const ctx = getActiveSyncContext();
+    if (!ctx) {
+      throw new Error(ONLINE_REQUIRED_MSG);
+    }
+
+    const storagePath = `${ctx.workspaceId}/${itemId}.jpg`;
+    try {
+      const base64 = await FileSystem.readAsStringAsync(localUri, {
+        encoding: FileSystem.EncodingType?.Base64 || ('base64' as any),
+      });
+      const bytes = base64ToUint8Array(base64);
+
+      const { error: uploadErr } = await supabase.storage
+        .from('moodboard-assets')
+        .upload(storagePath, bytes, {
+          contentType: 'image/jpeg',
+          upsert: true,
+        });
+
+      if (uploadErr) {
+        throw new Error(`${ONLINE_REQUIRED_MSG} (${uploadErr.message})`);
+      }
+
+      const { data: pubData } = supabase.storage
+        .from('moodboard-assets')
+        .getPublicUrl(storagePath);
+
+      if (!pubData?.publicUrl) {
+        throw new Error(ONLINE_REQUIRED_MSG);
+      }
+
+      return { imageUrl: pubData.publicUrl, storagePath };
+    } catch (err: any) {
+      if (err?.message?.includes('Nyalakan data seluler')) {
+        throw err;
+      }
+      throw new Error(ONLINE_REQUIRED_MSG);
+    }
+  }
+
+  static async pushMoodboardItem(item: MoodboardItem): Promise<void> {
+    const ctx = getActiveSyncContext();
+    if (!ctx || !isValidUuid(item.id)) {
+      throw new Error(ONLINE_REQUIRED_MSG);
+    }
+
+    const vendorId = item.vendorId && isValidUuid(item.vendorId) ? item.vendorId : null;
+    const { error } = await supabase.from('moodboard_items').upsert({
+      id: item.id,
+      workspace_id: ctx.workspaceId,
+      vendor_id: vendorId,
+      title: item.title,
+      category: item.category,
+      image_url: item.imageUrl || null,
+      storage_path: item.storagePath || null,
+      reference_url: item.referenceUrl || null,
+      color_palette: item.colorPalette || [],
+      notes: item.notes || null,
+      is_final: !!item.isFinal,
+      created_by: item.createdBy || null,
+      created_at: item.createdAt,
+    });
+
+    if (error) {
+      throw new Error(`${ONLINE_REQUIRED_MSG} (${error.message})`);
+    }
+  }
+
+  static async deleteMoodboardItem(id: string, storagePath?: string): Promise<void> {
+    const ctx = getActiveSyncContext();
+    if (!ctx || !isValidUuid(id)) {
+      throw new Error(ONLINE_REQUIRED_MSG);
+    }
+
+    const { error } = await supabase
+      .from('moodboard_items')
+      .delete()
+      .eq('id', id)
+      .eq('workspace_id', ctx.workspaceId);
+
+    if (error) {
+      throw new Error(`${ONLINE_REQUIRED_MSG} (${error.message})`);
+    }
+
+    if (storagePath) {
+      await supabase.storage.from('moodboard-assets').remove([storagePath]).catch(() => {});
+    }
   }
 
   static async updateWorkspaceWeddingDate(weddingDateIso: string): Promise<void> {
