@@ -116,6 +116,10 @@ export default function ChecklistScreen() {
   const [catInputName, setCatInputName] = useState('');
   const [catInputIcon, setCatInputIcon] = useState<string>('ribbon-outline');
 
+  // Confirmation Toggle Modal State
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [taskToToggle, setTaskToToggle] = useState<ChecklistItem | null>(null);
+
   const categoryLabels = ['Semua', ...taskCategories.map((c) => c.label)];
   const categoryKeys = ['all', ...taskCategories.map((c) => c.key)];
 
@@ -177,9 +181,17 @@ export default function ChecklistScreen() {
     setShowInlineCatInput(false);
   };
 
-  const toggleTask = (id: string) => {
+  const requestToggleTask = (task: ChecklistItem) => {
+    setTaskToToggle(task);
+    setConfirmModalVisible(true);
+  };
+
+  const confirmToggleTask = () => {
+    if (!taskToToggle) return;
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    toggleTaskStore(id);
+    toggleTaskStore(taskToToggle.id);
+    setConfirmModalVisible(false);
+    setTaskToToggle(null);
   };
 
   const handleSaveTask = () => {
@@ -375,7 +387,7 @@ export default function ChecklistScreen() {
                   <Card style={[styles.taskCard, t.completed && styles.taskCardCompleted]}>
                     <TouchableOpacity
                       activeOpacity={0.7}
-                      onPress={() => toggleTask(t.id)}
+                      onPress={() => requestToggleTask(t)}
                       onLongPress={() => openEditModal(t)}
                       delayLongPress={300}
                       style={styles.taskCardInner}
@@ -833,6 +845,73 @@ export default function ChecklistScreen() {
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Confirmation Alert Dialog for Task Toggle */}
+      <Modal
+        visible={confirmModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmModalVisible(false)}
+      >
+        <View style={styles.alertOverlay}>
+          <View style={styles.alertCard}>
+            <View
+              style={[
+                styles.alertIconCircle,
+                {
+                  backgroundColor: taskToToggle?.completed
+                    ? `${colors.warning}18`
+                    : `${colors.success}18`,
+                },
+              ]}
+            >
+              <Ionicons
+                name={taskToToggle?.completed ? 'arrow-undo-outline' : 'checkmark-done-outline'}
+                size={28}
+                color={taskToToggle?.completed ? colors.warning : colors.success}
+              />
+            </View>
+
+            <Text style={styles.alertTitle}>
+              {taskToToggle?.completed ? 'Ubah Menjadi Belum Selesai?' : 'Tandai Tugas Selesai?'}
+            </Text>
+
+            <Text style={styles.alertMessage}>
+              {taskToToggle?.completed
+                ? `Apakah kamu yakin ingin mengembalikan tugas "${taskToToggle?.title}" menjadi belum selesai?`
+                : `Apakah tugas "${taskToToggle?.title}" sudah selesai dilaksanakan?`}
+            </Text>
+
+            <View style={styles.alertActions}>
+              <TouchableOpacity
+                onPress={() => {
+                  setConfirmModalVisible(false);
+                  setTaskToToggle(null);
+                }}
+                activeOpacity={0.75}
+                style={styles.alertCancelBtn}
+              >
+                <Text style={styles.alertCancelText}>Batal</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={confirmToggleTask}
+                activeOpacity={0.85}
+                style={[
+                  styles.alertConfirmBtn,
+                  {
+                    backgroundColor: taskToToggle?.completed ? colors.warning : colors.accent,
+                  },
+                ]}
+              >
+                <Text style={styles.alertConfirmText}>
+                  {taskToToggle?.completed ? 'Ya, Ubah' : 'Ya, Selesai'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -1331,5 +1410,79 @@ const styles = StyleSheet.create({
   iconChoiceBtnActive: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,
+  },
+  alertOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  alertCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: colors.cardBg,
+    borderRadius: 20,
+    padding: 22,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  alertIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  alertTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  alertMessage: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 20,
+  },
+  alertActions: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  alertCancelBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bg,
+  },
+  alertCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  alertConfirmBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  alertConfirmText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textLight,
   },
 });
