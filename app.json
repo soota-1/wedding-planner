@@ -33,6 +33,12 @@
           "defaultChannel": "wedding-reminders"
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Izinkan Wedding Tracker mengakses galeri foto untuk menambahkan inspirasi moodboard."
+        }
+      ],
       "expo-sharing"
     ]
   }

@@ -169,8 +169,16 @@ describe('useWeddingStore (Phase 4 Unified Store & Persistence)', () => {
 
     await useWeddingStore.getState().updateMoodboardItemOnline(created.id, {
       title: 'Gaun Pemberkatan Final',
+      referenceUrl: 'https://pin.it/temp',
+    });
+    expect(useWeddingStore.getState().moodboardItems[0].referenceUrl).toBe('https://pin.it/temp');
+
+    // Clearing referenceUrl explicitly on an item that still has a photo
+    await useWeddingStore.getState().updateMoodboardItemOnline(created.id, {
+      referenceUrl: undefined,
     });
     expect(useWeddingStore.getState().moodboardItems[0].title).toBe('Gaun Pemberkatan Final');
+    expect(useWeddingStore.getState().moodboardItems[0].referenceUrl).toBeUndefined();
 
     // Cloud deletion clearing list to []
     useWeddingStore.getState().hydrateFromCloud({ moodboardItems: [] });

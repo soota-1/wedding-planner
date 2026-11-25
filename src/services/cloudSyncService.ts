@@ -21,10 +21,16 @@ const ONLINE_REQUIRED_MSG =
 function base64ToUint8Array(base64: string): Uint8Array {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
   const clean = base64.replace(/[^A-Za-z0-9+/=]/g, '');
+  if (clean.length === 0 || clean.length % 4 !== 0) {
+    return new Uint8Array(0);
+  }
   const len = clean.length;
   let bufferLength = Math.floor((len * 3) / 4);
   if (clean[len - 1] === '=') bufferLength--;
   if (clean[len - 2] === '=') bufferLength--;
+  if (bufferLength <= 0) {
+    return new Uint8Array(0);
+  }
 
   const bytes = new Uint8Array(bufferLength);
   let p = 0;
@@ -35,10 +41,10 @@ function base64ToUint8Array(base64: string): Uint8Array {
     const encoded4 = chars.indexOf(clean[i + 3]);
 
     bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
-    if (encoded3 !== 64 && clean[i + 2] !== '=') {
+    if (encoded3 !== -1 && clean[i + 2] !== '=') {
       bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
     }
-    if (encoded4 !== 64 && clean[i + 3] !== '=') {
+    if (encoded4 !== -1 && clean[i + 3] !== '=') {
       bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
     }
   }
@@ -271,6 +277,10 @@ export class CloudSyncService {
       status: d.status === 'rejected' ? 'expired' : d.status || 'pending',
       notes: d.notes || undefined,
     }));
+
+    if (moodboardRes.error) {
+      throw new Error(`${ONLINE_REQUIRED_MSG} (${moodboardRes.error.message})`);
+    }
 
     const mappedMoodboard: MoodboardItem[] = (moodboardRes.data || []).map((m: any) => ({
       id: m.id,
@@ -549,14 +559,15 @@ export class CloudSyncService {
 
   static async uploadMoodboardImage(
     localUri: string,
-    itemId: string
+    itemId: string,
+    previousStoragePath?: string
   ): Promise<{ imageUrl: string; storagePath: string }> {
     const ctx = getActiveSyncContext();
     if (!ctx) {
       throw new Error(ONLINE_REQUIRED_MSG);
     }
 
-    const storagePath = `${ctx.workspaceId}/${itemId}.jpg`;
+    const storagePath = `${ctx.workspaceId}/${itemId}-${Date.now()}.jpg`;
     try {
       const base64 = await FileSystem.readAsStringAsync(localUri, {
         encoding: FileSystem.EncodingType?.Base64 || ('base64' as any),
@@ -580,6 +591,10 @@ export class CloudSyncService {
 
       if (!pubData?.publicUrl) {
         throw new Error(ONLINE_REQUIRED_MSG);
+      }
+
+      if (previousStoragePath && previousStoragePath !== storagePath) {
+        await supabase.storage.from('moodboard-assets').remove([previousStoragePath]).catch(() => {});
       }
 
       return { imageUrl: pubData.publicUrl, storagePath };

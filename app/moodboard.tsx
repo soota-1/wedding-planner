@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -32,7 +32,7 @@ import {
   MoodboardItem,
 } from '../src/stores/useWeddingStore';
 import { useAuthStore } from '../src/stores/useAuthStore';
-import { isSupabaseConfigured } from '../src/services/cloudSyncService';
+import { isSupabaseConfigured, isValidUuid } from '../src/services/cloudSyncService';
 import {
   exportMoodboardBriefPdf,
   shareSingleMoodboardItem,
@@ -83,11 +83,16 @@ export default function MoodboardScreen() {
   const isCloudReady = isSupabaseConfigured() && !!authUser && !!activeWorkspace?.id;
 
   // Filters
+  const rawVendorParam = Array.isArray(params?.vendorId) ? params.vendorId[0] : params?.vendorId;
   const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(0);
   const [onlyFinal, setOnlyFinal] = useState(false);
   const [filterVendorId, setFilterVendorId] = useState<string | null>(
-    typeof params?.vendorId === 'string' && params.vendorId ? params.vendorId : null
+    typeof rawVendorParam === 'string' && rawVendorParam ? rawVendorParam : null
   );
+
+  useEffect(() => {
+    setFilterVendorId(typeof rawVendorParam === 'string' && rawVendorParam ? rawVendorParam : null);
+  }, [rawVendorParam]);
 
   // Form Modal State
   const [formModalVisible, setFormModalVisible] = useState(false);
@@ -96,6 +101,7 @@ export default function MoodboardScreen() {
   const [formCategory, setFormCategory] = useState<MoodboardCategory>('decor');
   const [formLocalImageUri, setFormLocalImageUri] = useState<string | undefined>(undefined);
   const [formExistingImageUrl, setFormExistingImageUrl] = useState<string | undefined>(undefined);
+  const [formClearExistingPhoto, setFormClearExistingPhoto] = useState(false);
   const [formRefUrl, setFormRefUrl] = useState('');
   const [formVendorId, setFormVendorId] = useState<string | undefined>(undefined);
   const [formPalette, setFormPalette] = useState<string[]>(['#F8F7F4', '#9E5A47']);
@@ -104,17 +110,28 @@ export default function MoodboardScreen() {
   const [formIsFinal, setFormIsFinal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Detail Modal State
-  const [detailItem, setDetailItem] = useState<MoodboardItem | null>(null);
+  // Detail Modal State (always derive live item from store)
+  const [detailItemId, setDetailItemId] = useState<string | null>(null);
+  const detailItem = detailItemId
+    ? moodboardItems.find((m) => m.id === detailItemId) ?? null
+    : null;
   const [isSharing, setIsSharing] = useState(false);
+  const [shareFeedback, setShareFeedback] = useState<string | null>(null);
+
+  const selectableVendors = isCloudReady
+    ? vendors.filter((v) => isValidUuid(v.id))
+    : vendors;
 
   const activeCategoryKey = CATEGORY_TABS[selectedCategoryIndex]?.key || 'all';
-  const filteredItems = moodboardItems.filter((item) => {
+  const scopedBaseItems = moodboardItems.filter((item) => {
     const matchCat = activeCategoryKey === 'all' || item.category === activeCategoryKey;
-    const matchFinal = !onlyFinal || item.isFinal;
     const matchVendor = !filterVendorId || item.vendorId === filterVendorId;
-    return matchCat && matchFinal && matchVendor;
+    return matchCat && matchVendor;
   });
+  const scopedFinalCount = scopedBaseItems.filter((i) => i.isFinal).length;
+  const filteredItems = onlyFinal
+    ? scopedBaseItems.filter((i) => i.isFinal)
+    : scopedBaseItems;
 
   const activeFilterVendor = filterVendorId
     ? vendors.find((v) => v.id === filterVendorId)
@@ -133,8 +150,11 @@ export default function MoodboardScreen() {
     setFormCategory(activeCategoryKey === 'all' ? 'decor' : activeCategoryKey);
     setFormLocalImageUri(undefined);
     setFormExistingImageUrl(undefined);
+    setFormClearExistingPhoto(false);
     setFormRefUrl('');
-    setFormVendorId(filterVendorId || undefined);
+    setFormVendorId(
+      filterVendorId && (!isCloudReady || isValidUuid(filterVendorId)) ? filterVendorId : undefined
+    );
     setFormPalette(['#F8F7F4', '#9E5A47']);
     setCustomHexInput('');
     setFormNotes('');
@@ -148,13 +168,14 @@ export default function MoodboardScreen() {
     setFormCategory(item.category);
     setFormLocalImageUri(undefined);
     setFormExistingImageUrl(item.imageUrl);
+    setFormClearExistingPhoto(false);
     setFormRefUrl(item.referenceUrl || '');
     setFormVendorId(item.vendorId);
     setFormPalette(item.colorPalette || []);
     setCustomHexInput('');
     setFormNotes(item.notes || '');
     setFormIsFinal(item.isFinal);
-    setDetailItem(null);
+    setDetailItemId(null);
     setFormModalVisible(true);
   };
 
@@ -167,13 +188,14 @@ export default function MoodboardScreen() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: (ImagePicker.MediaTypeOptions?.Images || 'Images') as any,
+        mediaTypes: ['images'] as any,
         allowsEditing: false,
         quality: 0.7,
       });
 
       if (!result.canceled && result.assets && result.assets[0]?.uri) {
         setFormLocalImageUri(result.assets[0].uri);
+        setFormClearExistingPhoto(false);
       }
     } catch {
       Alert.alert('Gagal Membuka Galeri', 'Tidak dapat memilih foto dari galeri saat ini.');
@@ -223,19 +245,20 @@ export default function MoodboardScreen() {
     setIsSaving(true);
     try {
       if (editingItem) {
-        await updateMoodboardItemOnline(
-          editingItem.id,
-          {
-            title: trimmedTitle,
-            category: formCategory,
-            referenceUrl: trimmedRef || undefined,
-            vendorId: formVendorId,
-            colorPalette: formPalette,
-            notes: formNotes.trim() || undefined,
-            isFinal: formIsFinal,
-          },
-          formLocalImageUri
-        );
+        const updatePatch: Partial<MoodboardItem> = {
+          title: trimmedTitle,
+          category: formCategory,
+          referenceUrl: trimmedRef || undefined,
+          vendorId: formVendorId,
+          colorPalette: formPalette,
+          notes: formNotes.trim() || undefined,
+          isFinal: formIsFinal,
+        };
+        if (formClearExistingPhoto && !formLocalImageUri) {
+          updatePatch.imageUrl = undefined;
+          updatePatch.storagePath = undefined;
+        }
+        await updateMoodboardItemOnline(editingItem.id, updatePatch, formLocalImageUri);
       } else {
         await addMoodboardItemOnline(
           {
@@ -267,9 +290,6 @@ export default function MoodboardScreen() {
     setIsSaving(true);
     try {
       await toggleMoodboardFinalOnline(item.id);
-      if (detailItem && detailItem.id === item.id) {
-        setDetailItem({ ...item, isFinal: !item.isFinal });
-      }
     } catch (err: any) {
       Alert.alert(
         'Gagal Memperbarui Status',
@@ -290,7 +310,7 @@ export default function MoodboardScreen() {
           setIsSaving(true);
           try {
             await deleteMoodboardItemOnline(item.id);
-            setDetailItem(null);
+            setDetailItemId(null);
           } catch (err: any) {
             Alert.alert(
               'Gagal Menghapus',
@@ -306,14 +326,22 @@ export default function MoodboardScreen() {
 
   const handleQuickShare = async (item: MoodboardItem) => {
     setIsSharing(true);
+    setShareFeedback(null);
     try {
       const linkedVendor = item.vendorId ? vendors.find((v) => v.id === item.vendorId) : undefined;
+      if (item.imageUrl) {
+        setShareFeedback('Catatan & link disalin ke clipboard — tinggal Paste di chat vendor.');
+      }
       const res = await shareSingleMoodboardItem(item, linkedVendor);
       if (!res.ok) {
+        setShareFeedback(null);
         Alert.alert('Gagal Membagikan', res.message);
-      } else if (res.mode === 'image_with_clipboard') {
-        Alert.alert('Keterangan Disalin', res.message);
+      } else {
+        setShareFeedback(res.message);
       }
+    } catch {
+      setShareFeedback(null);
+      Alert.alert('Gagal Membagikan', 'Tidak dapat membagikan referensi saat ini.');
     } finally {
       setIsSharing(false);
     }
@@ -363,7 +391,17 @@ export default function MoodboardScreen() {
             <Text style={styles.kicker}>INSPIRASI VISUAL</Text>
             <Text style={styles.heading}>Moodboard & Referensi</Text>
           </View>
-          <TouchableOpacity onPress={openAddModal} activeOpacity={0.8} style={styles.addBtn}>
+          <TouchableOpacity
+            onPress={() => {
+              if (!isCloudReady) {
+                ensureOnlineAlert();
+                return;
+              }
+              openAddModal();
+            }}
+            activeOpacity={0.8}
+            style={styles.addBtn}
+          >
             <Ionicons name="add" size={18} color={colors.textLight} />
             <Text style={styles.addBtnText}>Tambah</Text>
           </TouchableOpacity>
@@ -421,7 +459,7 @@ export default function MoodboardScreen() {
               color={onlyFinal ? colors.textLight : colors.secondary}
             />
             <Text style={[styles.finalFilterText, onlyFinal && { color: colors.textLight }]}>
-              Hanya Final ({moodboardItems.filter((i) => i.isFinal).length})
+              Hanya Final ({scopedFinalCount})
             </Text>
           </TouchableOpacity>
 
@@ -451,6 +489,7 @@ export default function MoodboardScreen() {
                 onPress={() => {
                   if (!isCloudReady) {
                     ensureOnlineAlert();
+                    return;
                   }
                   openAddModal();
                 }}
@@ -475,7 +514,10 @@ export default function MoodboardScreen() {
                     <Card style={styles.moodCard}>
                       <TouchableOpacity
                         activeOpacity={0.8}
-                        onPress={() => setDetailItem(item)}
+                        onPress={() => {
+                          setShareFeedback(null);
+                          setDetailItemId(item.id);
+                        }}
                       >
                         {item.imageUrl ? (
                           <View style={styles.thumbWrap}>
@@ -511,9 +553,9 @@ export default function MoodboardScreen() {
 
                           {item.colorPalette && item.colorPalette.length > 0 ? (
                             <View style={styles.swatchDotsRow}>
-                              {item.colorPalette.slice(0, 4).map((hex) => (
+                              {item.colorPalette.slice(0, 4).map((hex, hexIdx) => (
                                 <View
-                                  key={hex}
+                                  key={`${hex}-${hexIdx}`}
                                   style={[styles.swatchDot, { backgroundColor: hex }]}
                                 />
                               ))}
@@ -535,7 +577,9 @@ export default function MoodboardScreen() {
         visible={formModalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setFormModalVisible(false)}
+        onRequestClose={() => {
+          if (!isSaving) setFormModalVisible(false);
+        }}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -544,7 +588,9 @@ export default function MoodboardScreen() {
           <TouchableOpacity
             style={styles.modalBackdrop}
             activeOpacity={1}
-            onPress={() => setFormModalVisible(false)}
+            onPress={() => {
+              if (!isSaving) setFormModalVisible(false);
+            }}
           />
           <View style={[styles.modalSheet, { maxHeight: '90%' }]}>
             <View style={styles.sheetHandle} />
@@ -552,7 +598,11 @@ export default function MoodboardScreen() {
               <Text style={styles.modalTitle}>
                 {editingItem ? 'Edit Referensi' : 'Tambah Inspirasi Baru'}
               </Text>
-              <TouchableOpacity onPress={() => setFormModalVisible(false)}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (!isSaving) setFormModalVisible(false);
+                }}
+              >
                 <Ionicons name="close" size={22} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -563,13 +613,28 @@ export default function MoodboardScreen() {
               contentContainerStyle={{ paddingBottom: 24 }}
             >
               {/* Photo Upload Picker */}
-              <Text style={styles.fieldLabel}>Foto dari Galeri HP (Opsional jika ada Link)</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={styles.fieldLabel}>Foto dari Galeri HP (Opsional jika ada Link)</Text>
+                {(formLocalImageUri || (formExistingImageUrl && !formClearExistingPhoto)) ? (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setFormLocalImageUri(undefined);
+                      setFormExistingImageUrl(undefined);
+                      setFormClearExistingPhoto(true);
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: colors.danger }}>
+                      Hapus Foto
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
               <TouchableOpacity
                 onPress={handlePickImage}
                 activeOpacity={0.8}
                 style={styles.photoPickerBox}
               >
-                {formLocalImageUri || formExistingImageUrl ? (
+                {(formLocalImageUri || (formExistingImageUrl && !formClearExistingPhoto)) ? (
                   <Image
                     source={{ uri: formLocalImageUri || formExistingImageUrl }}
                     style={styles.photoPreview}
@@ -633,7 +698,7 @@ export default function MoodboardScreen() {
                     Tanpa Vendor
                   </Text>
                 </TouchableOpacity>
-                {vendors.map((v) => {
+                {selectableVendors.map((v) => {
                   const active = formVendorId === v.id;
                   return (
                     <TouchableOpacity
@@ -742,13 +807,13 @@ export default function MoodboardScreen() {
         visible={!!detailItem}
         transparent
         animationType="slide"
-        onRequestClose={() => setDetailItem(null)}
+        onRequestClose={() => setDetailItemId(null)}
       >
         <View style={styles.modalOverlay}>
           <TouchableOpacity
             style={styles.modalBackdrop}
             activeOpacity={1}
-            onPress={() => setDetailItem(null)}
+            onPress={() => setDetailItemId(null)}
           />
           {detailItem ? (
             <View style={[styles.modalSheet, { maxHeight: '90%' }]}>
@@ -760,7 +825,7 @@ export default function MoodboardScreen() {
                   )}`}
                   variant={detailItem.isFinal ? 'warning' : 'neutral'}
                 />
-                <TouchableOpacity onPress={() => setDetailItem(null)}>
+                <TouchableOpacity onPress={() => setDetailItemId(null)}>
                   <Ionicons name="close" size={22} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
@@ -780,8 +845,8 @@ export default function MoodboardScreen() {
 
                 {detailItem.colorPalette && detailItem.colorPalette.length > 0 ? (
                   <View style={styles.detailSwatchesWrap}>
-                    {detailItem.colorPalette.map((hex) => (
-                      <View key={hex} style={styles.detailSwatchChip}>
+                    {detailItem.colorPalette.map((hex, hexIdx) => (
+                      <View key={`${hex}-${hexIdx}`} style={styles.detailSwatchChip}>
                         <View style={[styles.swatchDot, { backgroundColor: hex }]} />
                         <Text style={styles.detailSwatchHex}>{hex}</Text>
                       </View>
@@ -795,7 +860,17 @@ export default function MoodboardScreen() {
 
                 {detailItem.referenceUrl ? (
                   <TouchableOpacity
-                    onPress={() => Linking.openURL(detailItem.referenceUrl!).catch(() => {})}
+                    onPress={() => {
+                      const raw = detailItem.referenceUrl!.trim();
+                      const normalized = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+                      if (!/^https?:\/\//i.test(normalized)) {
+                        Alert.alert('Link Tidak Valid', 'Gunakan link berawalan http:// atau https://');
+                        return;
+                      }
+                      Linking.openURL(normalized).catch(() => {
+                        Alert.alert('Gagal Membuka Link', 'Pastikan link referensi valid.');
+                      });
+                    }}
                     style={styles.detailLinkBox}
                   >
                     <Ionicons name="open-outline" size={16} color={colors.accent} />
@@ -803,6 +878,13 @@ export default function MoodboardScreen() {
                       {detailItem.referenceUrl}
                     </Text>
                   </TouchableOpacity>
+                ) : null}
+
+                {shareFeedback ? (
+                  <View style={styles.shareFeedbackBanner}>
+                    <Ionicons name="checkmark-circle-outline" size={15} color={colors.success} />
+                    <Text style={styles.shareFeedbackText}>{shareFeedback}</Text>
+                  </View>
                 ) : null}
 
                 {/* Quick Actions */}
@@ -1203,6 +1285,22 @@ const styles = StyleSheet.create({
     height: 46,
     borderRadius: 12,
     marginTop: 18,
+  },
+  shareFeedbackBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.successBg,
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 12,
+  },
+  shareFeedbackText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.success,
+    lineHeight: 17,
   },
   quickShareText: { fontSize: 14, fontWeight: '700', color: colors.textLight },
   detailSecondaryActions: {

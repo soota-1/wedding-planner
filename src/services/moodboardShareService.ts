@@ -65,19 +65,19 @@ export async function shareSingleMoodboardItem(
   const caption = formatMoodboardCaption(item, vendor?.name);
 
   if (item.imageUrl) {
+    let downloadedUri: string;
     try {
       const targetUri = `${FileSystem.cacheDirectory || ''}moodboard-${item.id}.jpg`;
       const downloaded = await FileSystem.downloadAsync(item.imageUrl, targetUri);
-      await Clipboard.setStringAsync(caption);
-      await Sharing.shareAsync(downloaded.uri, {
-        mimeType: 'image/jpeg',
-        dialogTitle: `Bagikan "${item.title}" ke Vendor`,
-      });
-      return {
-        ok: true,
-        mode: 'image_with_clipboard',
-        message: 'Catatan & link sudah disalin ke clipboard — tinggal Paste saat kirim foto di WhatsApp vendor.',
-      };
+      if (typeof downloaded.status === 'number' && downloaded.status >= 400) {
+        return {
+          ok: false,
+          mode: 'image_with_clipboard',
+          message:
+            'Foto referensi tidak dapat diunduh dari server. Nyalakan data seluler atau Wi-Fi dan coba lagi.',
+        };
+      }
+      downloadedUri = downloaded.uri;
     } catch {
       return {
         ok: false,
@@ -86,26 +86,65 @@ export async function shareSingleMoodboardItem(
           'Gagal mengunduh foto referensi. Nyalakan data seluler atau Wi-Fi untuk membagikan gambar online.',
       };
     }
+
+    try {
+      await Clipboard.setStringAsync(caption);
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        await Share.share({ message: caption });
+      } else {
+        await Sharing.shareAsync(downloadedUri, {
+          mimeType: 'image/jpeg',
+          dialogTitle: `Bagikan "${item.title}" ke Vendor`,
+        });
+      }
+      return {
+        ok: true,
+        mode: 'image_with_clipboard',
+        message:
+          'Catatan & link sudah disalin ke clipboard — tinggal Paste saat kirim foto di WhatsApp vendor.',
+      };
+    } catch {
+      return {
+        ok: false,
+        mode: 'image_with_clipboard',
+        message: 'Tidak dapat membuka menu bagikan di perangkat ini.',
+      };
+    }
   }
 
   if (vendor?.phone) {
     const cleanPhone = vendor.phone.replace(/[^0-9]/g, '');
-    const waPhone = cleanPhone.startsWith('0') ? `62${cleanPhone.slice(1)}` : cleanPhone;
-    const url = `https://wa.me/${waPhone}?text=${encodeURIComponent(caption)}`;
-    await Linking.openURL(url);
-    return {
-      ok: true,
-      mode: 'whatsapp_text',
-      message: `Membuka chat WhatsApp ${vendor.name} dengan catatan & link referensi.`,
-    };
+    if (cleanPhone.length > 0) {
+      const waPhone = cleanPhone.startsWith('0') ? `62${cleanPhone.slice(1)}` : cleanPhone;
+      const url = `https://wa.me/${waPhone}?text=${encodeURIComponent(caption)}`;
+      try {
+        await Linking.openURL(url);
+        return {
+          ok: true,
+          mode: 'whatsapp_text',
+          message: `Membuka chat WhatsApp ${vendor.name} dengan catatan & link referensi.`,
+        };
+      } catch {
+        // Fallback cleanly to native Share sheet below if WhatsApp is not installed
+      }
+    }
   }
 
-  await Share.share({ message: caption });
-  return {
-    ok: true,
-    mode: 'text_share',
-    message: 'Referensi siap dibagikan.',
-  };
+  try {
+    await Share.share({ message: caption });
+    return {
+      ok: true,
+      mode: 'text_share',
+      message: 'Referensi siap dibagikan.',
+    };
+  } catch {
+    return {
+      ok: false,
+      mode: 'text_share',
+      message: 'Tidak dapat membuka menu bagikan di perangkat ini.',
+    };
+  }
 }
 
 export async function exportMoodboardBriefPdf(params: {
@@ -157,7 +196,7 @@ export async function exportMoodboardBriefPdf(params: {
         : '';
 
       const notesHtml = item.notes
-        ? `<p style="font-size:12px;color:#333;line-height:1.5;margin:6px 0 0;">${escapeHtml(
+        ? `<p style="font-size:12px;color:#333;line-height:1.5;margin:6px 0 0;white-space:pre-line;">${escapeHtml(
             item.notes
           )}</p>`
         : '';

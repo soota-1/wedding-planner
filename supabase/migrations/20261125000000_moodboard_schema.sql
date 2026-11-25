@@ -53,22 +53,31 @@ CREATE POLICY "Workspace members can upload moodboard assets" ON storage.objects
     FOR INSERT WITH CHECK (
         bucket_id = 'moodboard-assets'
         AND auth.role() = 'authenticated'
-        AND (storage.foldername(name))[1] ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-        AND is_workspace_member(((storage.foldername(name))[1])::uuid)
+        AND CASE
+            WHEN (storage.foldername(name))[1] ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            THEN is_workspace_member(((storage.foldername(name))[1])::uuid)
+            ELSE false
+        END
     );
 
 CREATE POLICY "Workspace members can update moodboard assets" ON storage.objects
     FOR UPDATE USING (
         bucket_id = 'moodboard-assets'
         AND auth.role() = 'authenticated'
-        AND (storage.foldername(name))[1] ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-        AND is_workspace_member(((storage.foldername(name))[1])::uuid)
+        AND CASE
+            WHEN (storage.foldername(name))[1] ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            THEN is_workspace_member(((storage.foldername(name))[1])::uuid)
+            ELSE false
+        END
     );
 
 CREATE POLICY "Workspace members can delete moodboard assets" ON storage.objects
     FOR DELETE USING (
         bucket_id = 'moodboard-assets'
         AND auth.role() = 'authenticated'
-        AND (storage.foldername(name))[1] ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-        AND is_workspace_member(((storage.foldername(name))[1])::uuid)
+        AND CASE
+            WHEN (storage.foldername(name))[1] ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            THEN is_workspace_member(((storage.foldername(name))[1])::uuid)
+            ELSE false
+        END
     );

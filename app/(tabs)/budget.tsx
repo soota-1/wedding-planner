@@ -1257,11 +1257,11 @@ export default function BudgetScreen() {
                   );
                   return (
                     <View style={styles.detailCardBox}>
-                      <View style={styles.rowBetween}>
-                        <Text style={styles.detailCardLabel}>
+                      <View style={[styles.rowBetween, { flexWrap: 'wrap', rowGap: 8 }]}>
+                        <Text style={[styles.detailCardLabel, { flexShrink: 1 }]}>
                           Moodboard & Referensi ({vendorMoodboard.length})
                         </Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                           <TouchableOpacity
                             onPress={async () => {
                               const res = await exportMoodboardBriefPdf({
@@ -1289,7 +1289,7 @@ export default function BudgetScreen() {
                             style={styles.addScheduleLink}
                           >
                             <Ionicons name="add-circle-outline" size={16} color={colors.accent} />
-                            <Text style={styles.addScheduleLinkText}>Kelola</Text>
+                            <Text style={styles.addScheduleLinkText}>+ Tambah</Text>
                           </TouchableOpacity>
                         </View>
                       </View>

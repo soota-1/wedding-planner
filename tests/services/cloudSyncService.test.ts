@@ -193,11 +193,33 @@ describe('CloudSyncService (Phase 5 & 6A)', () => {
 
       const res = await CloudSyncService.uploadMoodboardImage('file:///photo.jpg', 'item-1');
       expect(mockUpload).toHaveBeenCalled();
-      expect(res.storagePath).toBe('33333333-3333-3333-3333-333333333333/item-1.jpg');
+      expect(res.storagePath).toContain('33333333-3333-3333-3333-333333333333/item-1');
       expect(res.imageUrl).toContain('moodboard-assets');
     } finally {
       process.env.EXPO_PUBLIC_SUPABASE_URL = prevUrl;
       process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY = prevKey;
     }
+  });
+
+  it('throws error in pullWorkspaceSnapshot if moodboard_items query returns an error', async () => {
+    const mockOrder = jest.fn().mockResolvedValue({
+      data: null,
+      error: { message: 'Network timeout' },
+    });
+    const mockEq = jest.fn(() => {
+      const p: any = Promise.resolve({ data: [], error: null });
+      p.single = jest.fn().mockResolvedValue({
+        data: { id: 'ws-123', wedding_date: '2027-10-10' },
+        error: null,
+      });
+      p.order = mockOrder;
+      return p;
+    });
+    const mockSelect = jest.fn(() => ({ eq: mockEq }));
+    jest.spyOn(supabase, 'from').mockReturnValue({ select: mockSelect } as any);
+
+    await expect(CloudSyncService.pullWorkspaceSnapshot('ws-123')).rejects.toThrow(
+      /Network timeout/i
+    );
   });
 });

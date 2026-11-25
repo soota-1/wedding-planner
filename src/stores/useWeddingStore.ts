@@ -712,16 +712,22 @@ export const useWeddingStore = create<WeddingState>()(
 
         const nextTitle = (patch.title !== undefined ? patch.title : current.title).trim();
         const nextRef =
-          patch.referenceUrl !== undefined ? patch.referenceUrl.trim() : current.referenceUrl;
+          'referenceUrl' in patch
+            ? patch.referenceUrl?.trim() || undefined
+            : current.referenceUrl;
         if (!nextTitle) {
           throw new Error('Judul inspirasi wajib diisi.');
         }
 
-        let imageUrl = patch.imageUrl !== undefined ? patch.imageUrl : current.imageUrl;
-        let storagePath = patch.storagePath !== undefined ? patch.storagePath : current.storagePath;
+        let imageUrl = 'imageUrl' in patch ? patch.imageUrl : current.imageUrl;
+        let storagePath = 'storagePath' in patch ? patch.storagePath : current.storagePath;
 
         if (newLocalImageUri) {
-          const uploaded = await CloudSyncService.uploadMoodboardImage(newLocalImageUri, id);
+          const uploaded = await CloudSyncService.uploadMoodboardImage(
+            newLocalImageUri,
+            id,
+            current.storagePath
+          );
           imageUrl = uploaded.imageUrl;
           storagePath = uploaded.storagePath;
         }
@@ -734,7 +740,7 @@ export const useWeddingStore = create<WeddingState>()(
           ...current,
           ...patch,
           title: nextTitle,
-          referenceUrl: nextRef || undefined,
+          referenceUrl: nextRef,
           imageUrl,
           storagePath,
         };

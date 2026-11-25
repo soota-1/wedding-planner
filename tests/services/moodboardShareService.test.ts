@@ -104,6 +104,27 @@ describe('MoodboardShareService (Task 5)', () => {
     expect(Sharing.shareAsync).not.toHaveBeenCalled();
   });
 
+  it('rejects HTTP >= 400 downloaded responses instead of sharing corrupt file', async () => {
+    (FileSystem.downloadAsync as jest.Mock).mockResolvedValueOnce({
+      uri: 'file:///mock-cache/error.jpg',
+      status: 404,
+    });
+
+    const item: MoodboardItem = {
+      id: 'm404',
+      title: 'Foto Hilang',
+      category: 'decor',
+      imageUrl: 'https://cdn.example.com/missing.jpg',
+      colorPalette: ['#F8F7F4'],
+      isFinal: false,
+      createdAt: '2026-11-25T10:00:00Z',
+    };
+
+    const res = await shareSingleMoodboardItem(item);
+    expect(res.ok).toBe(false);
+    expect(Sharing.shareAsync).not.toHaveBeenCalled();
+  });
+
   it('opens WhatsApp link when sharing link-only item with vendor phone, or Share sheet otherwise', async () => {
     const linkItem: MoodboardItem = {
       id: 'm2',
