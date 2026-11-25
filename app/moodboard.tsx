@@ -26,6 +26,7 @@ import { Card } from '../src/components/common/Card';
 import { Badge } from '../src/components/common/Badge';
 import { FilterChipBar } from '../src/components/common/FilterChipBar';
 import { FadeInView } from '../src/components/common/FadeInView';
+import { FullScreenPhotoModal } from '../src/components/common/FullScreenPhotoModal';
 import {
   useWeddingStore,
   MoodboardCategory,
@@ -965,50 +966,11 @@ export default function MoodboardScreen() {
         </View>
       </Modal>
 
-      {/* Full-Screen Photo Lightbox Modal (Dark Translucent Backdrop) */}
-      <Modal
-        visible={!!fullScreenPhoto}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setFullScreenPhoto(null)}
-      >
-        <View style={styles.lightboxOverlay}>
-          <TouchableOpacity
-            style={styles.lightboxBackdropTap}
-            activeOpacity={1}
-            onPress={() => setFullScreenPhoto(null)}
-          />
-          <SafeAreaView style={styles.lightboxContent} edges={['top', 'bottom']}>
-            <View style={styles.lightboxHeader}>
-              <Text style={styles.lightboxTitle} numberOfLines={1}>
-                {fullScreenPhoto?.title || ''}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setFullScreenPhoto(null)}
-                activeOpacity={0.8}
-                style={styles.lightboxCloseBtn}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="close" size={22} color="#FFF" />
-              </TouchableOpacity>
-            </View>
-
-            {fullScreenPhoto ? (
-              <TouchableOpacity
-                activeOpacity={1}
-                onPress={() => setFullScreenPhoto(null)}
-                style={styles.lightboxImageWrap}
-              >
-                <Image
-                  source={{ uri: fullScreenPhoto.uri }}
-                  style={styles.lightboxImage}
-                  resizeMode="contain"
-                />
-              </TouchableOpacity>
-            ) : null}
-          </SafeAreaView>
-        </View>
-      </Modal>
+      {/* Full-Screen Zoomable Photo Lightbox Modal */}
+      <FullScreenPhotoModal
+        photo={fullScreenPhoto}
+        onClose={() => setFullScreenPhoto(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -1427,49 +1389,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
   },
   secondaryActionText: { fontSize: 12, fontWeight: '600', color: colors.textPrimary },
-  lightboxOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.86)',
-    justifyContent: 'center',
-  },
-  lightboxBackdropTap: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  lightboxContent: {
-    flex: 1,
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  lightboxHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    paddingTop: 8,
-  },
-  lightboxTitle: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#FFF',
-  },
-  lightboxCloseBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  lightboxImageWrap: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: 12,
-  },
-  lightboxImage: {
-    width: '100%',
-    height: '100%',
-  },
 });
