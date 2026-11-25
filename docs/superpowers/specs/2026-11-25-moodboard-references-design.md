@@ -1,7 +1,7 @@
 # Design Spec: Moodboard & Referensi Visual Pernikahan
 
 **Tanggal:** 2026-11-25  
-**Status:** Siap Direview & Disetujui User  
+**Status:** Disetujui User (Online-First Sync)  
 **Target Aplikasi:** Wedding Tracker (`Octa & Jenesia`) — Expo SDK 58 / React Native / Supabase
 
 ---
@@ -30,7 +30,7 @@ Fitur **Moodboard & Referensi** hadir agar Octa dan Jenesia dapat menyimpan insp
 - Tidak membangun portal login eksternal khusus untuk vendor.
 
 ### Anti-Goals (Hal yang Dihindari)
-- **Foto hilang di HP pasangan:** Menyimpan hanya path lokal (`file://...`) di database akan membuat foto yang diunggah Jenesia gagal tampil di HP Octa.
+- **Data lokal terpisah / mode offline:** Tidak menyimpan foto atau item moodboard secara lokal saja tanpa cloud. Jika perangkat sedang offline/gagal koneksi, aplikasi harus memberi notifikasi/peringatan agar user menyalakan data/Wi-Fi daripada membuat data lokal yang tidak tersinkron.
 - **Database membengkak & lambat:** Menyimpan gambar beresolusi penuh dalam bentuk string Base64 di tabel PostgreSQL/Zustand akan memperlambat *hydration* dan *Realtime sync*.
 - **Bottom bar sesak:** Menambahkan tab ke-6 di *navigation bar* bawah akan mempersempit label tab pada layar HP berukuran kecil.
 
@@ -38,9 +38,8 @@ Fitur **Moodboard & Referensi** hadir agar Octa dan Jenesia dapat menyimpan insp
 
 ## 3. Constraints & Konteks Teknis Saat Ini
 
-- **Stack Aplikasi:** Expo `~58.0.26`, React Native `^0.88.1`, `expo-router`, Zustand + `AsyncStorage`, `@supabase/supabase-js`, tema editorial (*Alabaster* `#F8F7F4`, *Dusty Rosewood* `#9E5A47`, *Champagne Gold* `#B89242`).
-- **Sinkronisasi Pasangan:** Menggunakan `CloudSyncService` (`src/services/cloudSyncService.ts`) dan `subscribeToWorkspaceChanges` (`src/services/realtimeSync.ts`) berbasis `workspace_id` dengan Row-Level Security (`is_workspace_member(workspace_id)`).
-- **Mode Offline / Belum Konfigurasi Cloud:** Aplikasi tetap harus berfungsi jika berjalan dalam mode lokal/offline atau saat pengujian Jest di Node (dengan mock native module).
+- **Stack Aplikasi:** Expo `~58.0.26`, React Native `^0.88.1`, `expo-router`, Zustand + `AsyncStorage` (cache sesi/state), `@supabase/supabase-js`, tema editorial (*Alabaster* `#F8F7F4`, *Dusty Rosewood* `#9E5A47`, *Champagne Gold* `#B89242`).
+- **Online-Only Cloud Sync:** Semua operasi tulis Moodboard (tambah foto/link, ubah, tandai Final, hapus) langsung terintegrasi online ke Supabase Storage + `moodboard_items` dan disinkronkan *real-time* lewat `subscribeToWorkspaceChanges`. Jika perangkat terdeteksi offline atau koneksi ke Supabase gagal, operasi dibatalkan dengan notifikasi/alert jelas agar user menyalakan data/Wi-Fi.
 - **Paket Baru yang Diperlukan:** `expo-image-picker`, `expo-sharing`, `expo-print`, `expo-file-system`, dan `expo-clipboard`.
 
 ---
@@ -71,26 +70,25 @@ export interface MoodboardItem {
   id: string;
   title: string;
   category: MoodboardCategory;
-  imageUrl?: string;       // Public/storage URL dari Supabase Storage
-  localUri?: string;       // Fallback lokal sebelum/tanpa upload cloud
+  imageUrl?: string;       // Public URL dari Supabase Storage
   storagePath?: string;    // Path di bucket Supabase untuk keperluan hapus file
   referenceUrl?: string;   // Link Pinterest / Instagram / Web
   colorPalette: string[];  // Array hex color (maks 4 swatch)
   notes?: string;
   vendorId?: string;       // Relasi opsional ke VendorItem.id
   isFinal: boolean;        // Penanda Favorit / Final disepakati pasangan
-  syncStatus?: 'synced' | 'pending' | 'failed'; // Status upload foto/data ke cloud (engineering call)
   createdBy?: 'groom' | 'bride';
   createdAt: string;
 }
 ```
-Actions & Aturan Store *(termasuk engineering calls untuk keandalan offline & sinkronisasi)*:
-- **State Awal & Validasi Form *(Engineering Call)*:** `moodboardItems` dimulai kosong (`[]`) dengan tampilan *empty-state* + tombol CTA `"Tambah Inspirasi Pertama"` (tanpa *asset* demo statis). Setiap item wajib memiliki judul serta minimal salah satu dari **Foto Galeri** atau **Link Referensi**.
-- `addMoodboardItem(item)` -> optimistis tambah ke store dengan `syncStatus: 'pending'`, lalu panggil `CloudSyncService.pushMoodboardItem(...)` (mengunggah foto lokal ke Supabase Storage lalu upsert row DB, lalu menandai `syncStatus: 'synced'`). Jika offline atau gagal upload, item tetap tersimpan lokal dengan `syncStatus: 'pending' | 'failed'` beserta tombol *"Coba Sinkronkan Ulang"*.
-- `updateMoodboardItem(id, patch)` -> update state + push ke cloud.
-- `toggleMoodboardFinal(id)` -> toggle `isFinal` + push ke cloud.
-- `deleteMoodboardItem(id)` -> hapus dari state + hapus row & file di Supabase Storage.
-- `hydrateFromCloud(snapshot)` & `syncNow()` *(Engineering Call)*: `syncNow()` terlebih dahulu mencoba mengunggah item lokal yang berstatus `pending`/`failed`, lalu menarik `moodboard_items` dari cloud. `hydrateFromCloud()` menyinkronkan penuh daftar item cloud (termasuk saat pasangan menghapus seluruh item sehingga array cloud menjadi `[]`), sambil tetap mempertahankan item lokal yang belum tersinkron (`syncStatus !== 'synced'`).
+Actions & Aturan Store *(Online-First Sync)*:
+- **State Awal & Validasi Form:** `moodboardItems` dimulai kosong (`[]`) dengan tampilan *empty-state* + tombol CTA `"Tambah Inspirasi Pertama"` (tanpa *asset* demo statis). Setiap item wajib memiliki judul serta minimal salah satu dari **Foto Galeri** atau **Link Referensi**.
+- **Wajib Online saat Mutasi Data:**
+  - `addMoodboardItemOnline(input, pickedLocalUri?)`: mengunggah foto ke Supabase Storage (`moodboard-assets`) terlebih dahulu (jika ada foto), lalu menyimpan row ke `moodboard_items`, dan baru memperbarui state store setelah berhasil. Jika sedang offline / belum login cloud / gagal upload, operasi **dibatalkan** dan memunculkan alert: *"Koneksi Internet Diperlukan: Nyalakan data seluler atau Wi-Fi untuk menyimpan & menyinkronkan moodboard."*
+  - `updateMoodboardItemOnline(id, patch, newLocalUri?)`: memperbarui Storage (bila foto diganti) + row DB terlebih dahulu, baru memperbarui store (gagal jika offline dengan alert notifikasi koneksi).
+  - `toggleMoodboardFinalOnline(id)`: memperbarui `is_final` di DB terlebih dahulu, lalu memperbarui store (gagal jika offline dengan alert notifikasi koneksi).
+  - `deleteMoodboardItemOnline(id)`: menghapus row DB + objek Storage, lalu menghapus dari store (gagal jika offline dengan alert notifikasi koneksi).
+- `hydrateFromCloud(snapshot)`: langsung memperbarui `moodboardItems` mengikuti snapshot cloud secara penuh (termasuk array kosong `[]` saat semua item dihapus di cloud).
 
 ### 5.2 Skema Database & Storage (`supabase/migrations/20261125000000_moodboard_schema.sql`)
 1. **Tabel `moodboard_items`:**
@@ -121,7 +119,8 @@ Actions & Aturan Store *(termasuk engineering calls untuk keandalan offline & si
    - Didaftarkan di Root Stack (`app/_layout.tsx`), mendukung query param opsional `vendorId` agar bisa terbuka langsung terfilter untuk vendor tertentu.
    - Bar filter kategori (`Semua`, `Dekorasi`, `Busana`, `MUA`, `Foto`, `Lainnya`) + filter toggle `"★ Final Saja"`.
    - Tombol **"Ekspor Brief PDF"** di header/sub-header: jika pada cakupan filter/vendor aktif terdapat item bertanda `★ Final`, otomatis hanya mengekspor item `★ Final`; jika belum ada yang bertanda `★ Final`, otomatis mengekspor seluruh item pada cakupan aktif tersebut.
-   - Grid 2 kolom kartu visual menampilkan foto (atau kartu tautan bergaya editorial jika hanya berisi link), badge `★ Final`, badge status sinkronisasi jika masih `pending`/`failed`, judul, nama vendor tertaut, dan titik palet warna.
+   - Grid 2 kolom kartu visual menampilkan foto (atau kartu tautan bergaya editorial jika hanya berisi link), badge `★ Final`, judul, nama vendor tertaut, dan titik palet warna.
+   - Jika terdeteksi offline saat membuka/menyinkronkan atau saat mencoba menambah/mengedit/menghapus/menandai Final, tampilkan banner peringatan + alert **"Nyalakan data seluler atau Wi-Fi untuk mengakses & menyinkronkan moodboard online."**
    - **Modal Tambah / Edit:**
      - Pilih Foto dari Galeri (`expo-image-picker`, kompresi `0.7`).
      - Input opsional Link Referensi (Pinterest / Instagram) — minimal salah satu dari Foto atau Link Referensi harus diisi.
@@ -133,7 +132,7 @@ Actions & Aturan Store *(termasuk engineering calls untuk keandalan offline & si
 
 ### 5.4 Mekanisme Berbagi & Ekspor Brief (`src/services/moodboardShareService.ts`)
 - **Kirim Cepat (`shareSingleMoodboardItem`):**
-  - **Jika item memiliki foto** (`localUri` atau `imageUrl`): salin otomatis teks terformat (`Judul`, `Kategori`, `Palet Warna`, `Catatan Konsep`, `Link Referensi`) ke clipboard via `expo-clipboard` (`Clipboard.setStringAsync`), unduh foto ke cache lokal bila masih URL remote (`expo-file-system`), tampilkan notifikasi/konfirmasi singkat bahwa keterangan sudah disalin agar tinggal *Paste*, lalu buka Share Sheet via `expo-sharing` (`Sharing.shareAsync`) untuk mengirim foto ke WhatsApp vendor.
+  - **Jika item memiliki foto (`imageUrl`):** salin otomatis teks terformat (`Judul`, `Kategori`, `Palet Warna`, `Catatan Konsep`, `Link Referensi`) ke clipboard via `expo-clipboard` (`Clipboard.setStringAsync`), unduh foto dari `imageUrl` ke cache lokal (`expo-file-system`), tampilkan alert/konfirmasi bahwa keterangan sudah disalin agar tinggal *Paste*, lalu buka Share Sheet via `expo-sharing` (`Sharing.shareAsync`) untuk mengirim foto ke WhatsApp vendor. (Jika download foto gagal karena offline, tampilkan notif nyalakan data/Wi-Fi).
   - **Jika item hanya berupa link & catatan (tanpa foto):** langsung buka WhatsApp ke nomor vendor terkait (`https://wa.me/{phone}?text=...`) bila vendor memiliki nomor HP, atau buka `Share.share` teks+link sistem jika belum terhubung ke vendor bernomor HP.
 - **Ekspor Brief PDF (`exportMoodboardBriefPdf`):**
   - Menyeleksi item sesuai aturan cakupan: ambil item `isFinal === true` dalam filter/vendor aktif bila jumlahnya `>= 1`, atau ambil semua item dalam filter/vendor aktif bila belum ada yang `isFinal`. Bila 0 item tersedia, tampilkan pesan bahwa belum ada referensi untuk diekspor.
@@ -144,8 +143,8 @@ Actions & Aturan Store *(termasuk engineering calls untuk keandalan offline & si
 
 ## 6. Ringkasan Keputusan & Yang Diserahkan ke Builder
 
-### Keputusan Teknis (Engineering Calls) untuk Diverifikasi
-1. **Sinkronisasi Offline & Penghapusan Cloud:** Item yang dibuat offline/gagal upload tetap disimpan lokal dengan `syncStatus: 'pending' | 'failed'` beserta tombol retry; `syncNow()` mengirim item pending ke cloud lebih dulu sebelum pull, dan `hydrateFromCloud()` menerima array kosong dari cloud (penghapusan oleh pasangan) tanpa menghapus item lokal yang masih `pending`.
+### Keputusan Teknis yang Telah Disepakati
+1. **Integrasi Online Penuh (Tanpa Mode Lokal):** Semua aksi tambah/edit/hapus/upload gambar & sinkronisasi moodboard wajib online ke Supabase Storage + `moodboard_items`. Bila offline atau koneksi gagal, operasi tidak disimpan lokal melainkan memunculkan notifikasi agar user menyalakan data/Wi-Fi.
 2. **State Awal & Validasi Form:** `moodboardItems` dimulai kosong (`[]`) dengan *empty-state* CTA (tanpa gambar dummy bawaan), dan form mewajibkan minimal salah satu dari **Foto Galeri** atau **Link Referensi**.
 
 ### Yang Diserahkan ke Builder (Implementation Calls)
