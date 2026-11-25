@@ -79,6 +79,7 @@ export default function ChecklistScreen() {
 
   // Task Modal Form State
   const [modalVisible, setModalVisible] = useState(false);
+  const [modalStep, setModalStep] = useState<'category' | 'form'>('category');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [formCategory, setFormCategory] = useState<string>(taskCategories[0]?.key || 'canonical');
   const [formTitle, setFormTitle] = useState('');
@@ -110,6 +111,7 @@ export default function ChecklistScreen() {
     const defaultDate = subDays(safeWeddingDate, 30);
 
     setEditingTaskId(null);
+    setModalStep('category');
     setFormCategory(defaultCat);
     setFormTitle('');
     setFormPriority('medium');
@@ -126,6 +128,7 @@ export default function ChecklistScreen() {
   const openEditModal = (item: ChecklistItem) => {
     const derivedDate = subDays(safeWeddingDate, Math.abs(item.offsetDays));
     setEditingTaskId(item.id);
+    setModalStep('form');
     setFormCategory(item.category);
     setFormTitle(item.title);
     setFormPriority(item.priority);
@@ -406,9 +409,27 @@ export default function ChecklistScreen() {
         >
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editingTaskId ? 'Edit Tugas' : 'Tambah Tugas Baru'}
-              </Text>
+              <View style={styles.modalTitleRow}>
+                {modalStep === 'form' && !editingTaskId ? (
+                  <TouchableOpacity
+                    onPress={() => {
+                      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                      setModalStep('category');
+                    }}
+                    style={styles.stepBackBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="arrow-back" size={18} color={colors.textPrimary} />
+                  </TouchableOpacity>
+                ) : null}
+                <Text style={styles.modalTitle}>
+                  {editingTaskId
+                    ? 'Edit Tugas'
+                    : modalStep === 'category'
+                    ? 'Pilih Kategori Tugas'
+                    : 'Detail Tugas Baru'}
+                </Text>
+              </View>
               <TouchableOpacity
                 onPress={() => setModalVisible(false)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -422,68 +443,126 @@ export default function ChecklistScreen() {
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              {/* STEP 1: Pilih Kategori Terlebih Dahulu */}
-              <View style={styles.labelRowBetween}>
-                <Text style={styles.fieldLabel}>1. Pilih Kategori Tugas</Text>
-                <TouchableOpacity
-                  onPress={() => setShowInlineCatInput((v) => !v)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.inlineAddLink}>
-                    {showInlineCatInput ? 'Tutup' : '+ Kategori Baru'}
+              {modalStep === 'category' ? (
+                /* STEP 1 POPUP: Grid Card Pilihan Kategori */
+                <View>
+                  <Text style={styles.catStepSubtitle}>
+                    Pilih kategori terlebih dahulu sebelum mengisi tugas baru:
                   </Text>
-                </TouchableOpacity>
-              </View>
 
-              {showInlineCatInput ? (
-                <View style={styles.inlineCatRow}>
-                  <TextInput
-                    placeholder="Nama kategori baru..."
-                    placeholderTextColor={colors.textMuted}
-                    value={inlineNewCat}
-                    onChangeText={setInlineNewCat}
-                    style={[styles.modalInput, { flex: 1, marginBottom: 0 }]}
-                  />
-                  <TouchableOpacity
-                    onPress={handleInlineAddCategory}
-                    style={styles.inlineCatSaveBtn}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.inlineCatSaveText}>Tambah</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : null}
+                  <View style={styles.catGrid}>
+                    {taskCategories.map((cat) => {
+                      const count = tasks.filter((t) => t.category === cat.key).length;
+                      const iconName =
+                        cat.key === 'canonical'
+                          ? 'ribbon-outline'
+                          : cat.key === 'civil'
+                          ? 'document-text-outline'
+                          : cat.key === 'liturgy'
+                          ? 'musical-notes-outline'
+                          : cat.key === 'vendor'
+                          ? 'storefront-outline'
+                          : 'bookmark-outline';
 
-              <View style={styles.pillRow}>
-                {taskCategories.map((cat) => {
-                  const active = formCategory === cat.key;
-                  return (
+                      return (
+                        <TouchableOpacity
+                          key={cat.id}
+                          activeOpacity={0.75}
+                          onPress={() => {
+                            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                            setFormCategory(cat.key);
+                            setModalStep('form');
+                          }}
+                          style={styles.catPickCard}
+                        >
+                          <View style={styles.catPickIconCircle}>
+                            <Ionicons name={iconName as any} size={20} color={colors.accent} />
+                          </View>
+                          <Text style={styles.catPickLabel} numberOfLines={2}>
+                            {cat.label}
+                          </Text>
+                          <Text style={styles.catPickCount}>{count} tugas</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+
+                    {/* Add New Category Card */}
                     <TouchableOpacity
-                      key={cat.id}
-                      onPress={() => setFormCategory(cat.key)}
-                      style={[styles.selectPill, active && styles.selectPillActive]}
+                      activeOpacity={0.75}
+                      onPress={() => {
+                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                        setShowInlineCatInput((v) => !v);
+                      }}
+                      style={[styles.catPickCard, styles.catPickAddCard]}
                     >
-                      <Text style={[styles.selectPillText, active && styles.selectPillTextActive]}>
-                        {cat.label}
+                      <View style={[styles.catPickIconCircle, { backgroundColor: colors.cardBg }]}>
+                        <Ionicons name="add" size={22} color={colors.accent} />
+                      </View>
+                      <Text style={[styles.catPickLabel, { color: colors.accent }]}>
+                        Kategori Baru
                       </Text>
+                      <Text style={styles.catPickCount}>Buat custom</Text>
                     </TouchableOpacity>
-                  );
-                })}
-              </View>
+                  </View>
 
-              {/* STEP 2: Input Judul */}
-              <Text style={styles.fieldLabel}>2. Nama Tugas</Text>
-              <TextInput
-                placeholder="Misal: Fitting jas pengantin Octa"
-                placeholderTextColor={colors.textMuted}
-                value={formTitle}
-                onChangeText={setFormTitle}
-                style={styles.modalInput}
-                autoFocus={!editingTaskId}
-              />
+                  {showInlineCatInput ? (
+                    <View style={[styles.inlineCatRow, { marginTop: 12 }]}>
+                      <TextInput
+                        placeholder="Nama kategori baru..."
+                        placeholderTextColor={colors.textMuted}
+                        value={inlineNewCat}
+                        onChangeText={setInlineNewCat}
+                        style={[styles.modalInput, { flex: 1, marginBottom: 0 }]}
+                      />
+                      <TouchableOpacity
+                        onPress={() => {
+                          handleInlineAddCategory();
+                          setModalStep('form');
+                        }}
+                        style={styles.inlineCatSaveBtn}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.inlineCatSaveText}>Lanjut</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+                </View>
+              ) : (
+                /* STEP 2 POPUP: Form Input Tugas */
+                <View>
+                  <TouchableOpacity
+                    onPress={() => {
+                      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                      setModalStep('category');
+                    }}
+                    activeOpacity={0.75}
+                    style={styles.selectedCatBanner}
+                  >
+                    <View style={styles.selectedCatLeft}>
+                      <Ionicons name="folder-open-outline" size={16} color={colors.accent} />
+                      <Text style={styles.selectedCatText}>
+                        Kategori:{' '}
+                        <Text style={{ fontWeight: '700', color: colors.textPrimary }}>
+                          {taskCategories.find((c) => c.key === formCategory)?.label || formCategory}
+                        </Text>
+                      </Text>
+                    </View>
+                    <Text style={styles.inlineAddLink}>Ganti</Text>
+                  </TouchableOpacity>
 
-              {/* STEP 3: Tanggal Jatuh Tempo (Calendar Picker, auto H-) */}
-              <Text style={styles.fieldLabel}>3. Tanggal Jatuh Tempo (Otomatis Hitung H-)</Text>
+                  {/* Input Judul */}
+                  <Text style={styles.fieldLabel}>Nama Tugas</Text>
+                  <TextInput
+                    placeholder="Misal: Fitting jas pengantin Octa"
+                    placeholderTextColor={colors.textMuted}
+                    value={formTitle}
+                    onChangeText={setFormTitle}
+                    style={styles.modalInput}
+                    autoFocus={!editingTaskId}
+                  />
+
+                  {/* Tanggal Jatuh Tempo (Calendar Picker, auto H-) */}
+                  <Text style={styles.fieldLabel}>Tanggal Jatuh Tempo (Otomatis Hitung H-)</Text>
               <TouchableOpacity
                 onPress={() => {
                   LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -514,8 +593,8 @@ export default function ChecklistScreen() {
                 />
               ) : null}
 
-              {/* STEP 4: Prioritas */}
-              <Text style={styles.fieldLabel}>4. Tingkat Prioritas</Text>
+              {/* Prioritas */}
+              <Text style={styles.fieldLabel}>Tingkat Prioritas</Text>
               <View style={styles.pillRow}>
                 {priorityOptions.map((opt) => {
                   const active = formPriority === opt.key;
@@ -546,8 +625,8 @@ export default function ChecklistScreen() {
                 })}
               </View>
 
-              {/* STEP 5: Penanggung Jawab (PIC) */}
-              <Text style={styles.fieldLabel}>5. Penanggung Jawab (PIC)</Text>
+              {/* Penanggung Jawab (PIC) */}
+              <Text style={styles.fieldLabel}>Penanggung Jawab (PIC)</Text>
               <View style={styles.pillRow}>
                 {picOptions.map((opt) => {
                   const active = formPic === opt.key;
@@ -588,6 +667,8 @@ export default function ChecklistScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
+                </View>
+              )}
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
@@ -867,6 +948,87 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
+  },
+  modalTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  stepBackBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  catStepSubtitle: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginBottom: 14,
+    lineHeight: 19,
+  },
+  catGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 8,
+  },
+  catPickCard: {
+    width: '48%',
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    padding: 14,
+    alignItems: 'flex-start',
+  },
+  catPickAddCard: {
+    borderStyle: 'dashed',
+    borderColor: colors.accent,
+    backgroundColor: colors.accentLight,
+  },
+  catPickIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.accentLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  catPickLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 2,
+  },
+  catPickCount: {
+    fontSize: 11,
+    color: colors.textMuted,
+  },
+  selectedCatBanner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  selectedCatLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  selectedCatText: {
+    fontSize: 13,
+    color: colors.textSecondary,
   },
   labelRowBetween: {
     flexDirection: 'row',
