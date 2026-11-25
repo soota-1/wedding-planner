@@ -1,4 +1,5 @@
 import { useWeddingStore } from '../../src/stores/useWeddingStore';
+import { CloudSyncService } from '../../src/services/cloudSyncService';
 
 describe('useWeddingStore (Phase 4 Unified Store & Persistence)', () => {
   beforeEach(() => {
@@ -100,5 +101,93 @@ describe('useWeddingStore (Phase 4 Unified Store & Persistence)', () => {
 
     useWeddingStore.getState().deleteTaskCategory(created.id);
     expect(useWeddingStore.getState().taskCategories.length).toBe(initialCatCount);
+  });
+
+  it('starts moodboardItems empty and validates photo or referenceUrl requirement', async () => {
+    expect(useWeddingStore.getState().moodboardItems).toEqual([]);
+
+    await expect(
+      useWeddingStore.getState().addMoodboardItemOnline({
+        title: 'Tanpa Foto dan Link',
+        category: 'decor',
+        colorPalette: ['#F8F7F4'],
+        isFinal: false,
+      })
+    ).rejects.toThrow(/foto.*link|referensi/i);
+    expect(useWeddingStore.getState().moodboardItems).toEqual([]);
+  });
+
+  it('aborts moodboard mutations cleanly when offline without mutating state', async () => {
+    jest
+      .spyOn(CloudSyncService, 'pushMoodboardItem')
+      .mockRejectedValue(
+        new Error('Koneksi Internet Diperlukan: Nyalakan data seluler atau Wi-Fi.')
+      );
+
+    await expect(
+      useWeddingStore.getState().addMoodboardItemOnline({
+        title: 'Dekorasi Altar',
+        category: 'decor',
+        referenceUrl: 'https://pinterest.com/pin/1',
+        colorPalette: ['#9E5A47'],
+        isFinal: false,
+      })
+    ).rejects.toThrow(/Nyalakan data seluler atau Wi-Fi/i);
+
+    expect(useWeddingStore.getState().moodboardItems).toEqual([]);
+  });
+
+  it('supports online-first add, toggleFinal, update, delete, and empty cloud hydration', async () => {
+    const uploadSpy = jest
+      .spyOn(CloudSyncService, 'uploadMoodboardImage')
+      .mockResolvedValue({
+        imageUrl: 'https://cdn.example.com/photo.jpg',
+        storagePath: 'ws-1/item-1.jpg',
+      });
+    const pushSpy = jest.spyOn(CloudSyncService, 'pushMoodboardItem').mockResolvedValue();
+    const deleteSpy = jest.spyOn(CloudSyncService, 'deleteMoodboardItem').mockResolvedValue();
+
+    const created = await useWeddingStore.getState().addMoodboardItemOnline(
+      {
+        title: 'Gaun Pemberkatan',
+        category: 'attire',
+        colorPalette: ['#F8F7F4', '#B89242'],
+        notes: 'Lace klasik lengan panjang',
+        vendorId: 'v4',
+        isFinal: false,
+      },
+      'file:///mock-gallery/photo.jpg'
+    );
+
+    expect(uploadSpy).toHaveBeenCalled();
+    expect(pushSpy).toHaveBeenCalled();
+    expect(created.imageUrl).toBe('https://cdn.example.com/photo.jpg');
+    expect(useWeddingStore.getState().moodboardItems.length).toBe(1);
+
+    await useWeddingStore.getState().toggleMoodboardFinalOnline(created.id);
+    expect(useWeddingStore.getState().moodboardItems[0].isFinal).toBe(true);
+
+    await useWeddingStore.getState().updateMoodboardItemOnline(created.id, {
+      title: 'Gaun Pemberkatan Final',
+    });
+    expect(useWeddingStore.getState().moodboardItems[0].title).toBe('Gaun Pemberkatan Final');
+
+    // Cloud deletion clearing list to []
+    useWeddingStore.getState().hydrateFromCloud({ moodboardItems: [] });
+    expect(useWeddingStore.getState().moodboardItems).toEqual([]);
+
+    // Re-add then delete online
+    const created2 = await useWeddingStore.getState().addMoodboardItemOnline({
+      title: 'Makeup Natural',
+      category: 'makeup',
+      referenceUrl: 'https://instagram.com/p/mua',
+      colorPalette: ['#9E5A47'],
+      isFinal: true,
+    });
+    expect(useWeddingStore.getState().moodboardItems.length).toBe(1);
+
+    await useWeddingStore.getState().deleteMoodboardItemOnline(created2.id);
+    expect(deleteSpy).toHaveBeenCalledWith(created2.id, undefined);
+    expect(useWeddingStore.getState().moodboardItems).toEqual([]);
   });
 });

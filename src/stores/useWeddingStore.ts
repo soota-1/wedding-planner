@@ -336,6 +336,7 @@ export interface WeddingState {
   guests: GuestItem[];
   gifts: GiftItem[];
   documents: DocumentItem[];
+  moodboardItems: MoodboardItem[];
 
   // Profile actions
   updateProfile: (patch: Partial<WeddingProfile>) => void;
@@ -378,6 +379,19 @@ export interface WeddingState {
   updateDocument: (id: string, patch: Partial<DocumentItem>) => void;
   deleteDocument: (id: string) => void;
 
+  // Moodboard actions (Online-First Sync)
+  addMoodboardItemOnline: (
+    item: Omit<MoodboardItem, 'id' | 'createdAt' | 'imageUrl' | 'storagePath'>,
+    localImageUri?: string
+  ) => Promise<MoodboardItem>;
+  updateMoodboardItemOnline: (
+    id: string,
+    patch: Partial<MoodboardItem>,
+    newLocalImageUri?: string
+  ) => Promise<void>;
+  toggleMoodboardFinalOnline: (id: string) => Promise<void>;
+  deleteMoodboardItemOnline: (id: string) => Promise<void>;
+
   // Cloud Hydration & Reset
   hydrateFromCloud: (snapshot: {
     workspace?: { wedding_date?: string } | null;
@@ -389,13 +403,14 @@ export interface WeddingState {
     guests?: GuestItem[];
     gifts?: GiftItem[];
     documents?: DocumentItem[];
+    moodboardItems?: MoodboardItem[];
   }) => void;
   resetAllData: () => void;
 }
 
 export const useWeddingStore = create<WeddingState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       hasSeenOnboarding: false,
       setHasSeenOnboarding: (seen) => set({ hasSeenOnboarding: seen }),
       profile: DEFAULT_PROFILE,
@@ -407,6 +422,7 @@ export const useWeddingStore = create<WeddingState>()(
       guests: initialGuests,
       gifts: initialGifts,
       documents: initialDocuments,
+      moodboardItems: [],
 
       updateProfile: (patch) =>
         set((state) => {
@@ -653,6 +669,101 @@ export const useWeddingStore = create<WeddingState>()(
           return { documents: state.documents.filter((d) => d.id !== id) };
         }),
 
+      // Moodboard (Online-First: aborts if offline or missing media/link)
+      addMoodboardItemOnline: async (input, localImageUri) => {
+        const trimmedTitle = input.title.trim();
+        const trimmedRef = input.referenceUrl?.trim();
+        if (!trimmedTitle) {
+          throw new Error('Judul inspirasi wajib diisi.');
+        }
+        if (!localImageUri && !trimmedRef) {
+          throw new Error('Wajib melampirkan minimal Foto dari Galeri atau Link Referensi.');
+        }
+
+        const id = generateUuid();
+        let imageUrl: string | undefined;
+        let storagePath: string | undefined;
+
+        if (localImageUri) {
+          const uploaded = await CloudSyncService.uploadMoodboardImage(localImageUri, id);
+          imageUrl = uploaded.imageUrl;
+          storagePath = uploaded.storagePath;
+        }
+
+        const created: MoodboardItem = {
+          ...input,
+          id,
+          title: trimmedTitle,
+          referenceUrl: trimmedRef || undefined,
+          imageUrl,
+          storagePath,
+          colorPalette: input.colorPalette || [],
+          createdAt: new Date().toISOString(),
+        };
+
+        await CloudSyncService.pushMoodboardItem(created);
+        set((state) => ({ moodboardItems: [created, ...state.moodboardItems] }));
+        return created;
+      },
+
+      updateMoodboardItemOnline: async (id, patch, newLocalImageUri) => {
+        const current = get().moodboardItems.find((m) => m.id === id);
+        if (!current) return;
+
+        const nextTitle = (patch.title !== undefined ? patch.title : current.title).trim();
+        const nextRef =
+          patch.referenceUrl !== undefined ? patch.referenceUrl.trim() : current.referenceUrl;
+        if (!nextTitle) {
+          throw new Error('Judul inspirasi wajib diisi.');
+        }
+
+        let imageUrl = patch.imageUrl !== undefined ? patch.imageUrl : current.imageUrl;
+        let storagePath = patch.storagePath !== undefined ? patch.storagePath : current.storagePath;
+
+        if (newLocalImageUri) {
+          const uploaded = await CloudSyncService.uploadMoodboardImage(newLocalImageUri, id);
+          imageUrl = uploaded.imageUrl;
+          storagePath = uploaded.storagePath;
+        }
+
+        if (!imageUrl && !nextRef) {
+          throw new Error('Wajib melampirkan minimal Foto dari Galeri atau Link Referensi.');
+        }
+
+        const updated: MoodboardItem = {
+          ...current,
+          ...patch,
+          title: nextTitle,
+          referenceUrl: nextRef || undefined,
+          imageUrl,
+          storagePath,
+        };
+
+        await CloudSyncService.pushMoodboardItem(updated);
+        set((state) => ({
+          moodboardItems: state.moodboardItems.map((m) => (m.id === id ? updated : m)),
+        }));
+      },
+
+      toggleMoodboardFinalOnline: async (id) => {
+        const current = get().moodboardItems.find((m) => m.id === id);
+        if (!current) return;
+        const updated: MoodboardItem = { ...current, isFinal: !current.isFinal };
+        await CloudSyncService.pushMoodboardItem(updated);
+        set((state) => ({
+          moodboardItems: state.moodboardItems.map((m) => (m.id === id ? updated : m)),
+        }));
+      },
+
+      deleteMoodboardItemOnline: async (id) => {
+        const current = get().moodboardItems.find((m) => m.id === id);
+        if (!current) return;
+        await CloudSyncService.deleteMoodboardItem(id, current.storagePath);
+        set((state) => ({
+          moodboardItems: state.moodboardItems.filter((m) => m.id !== id),
+        }));
+      },
+
       // Cloud Hydration (updates store from Supabase without re-triggering push)
       hydrateFromCloud: (snapshot) =>
         set((state) => {
@@ -683,6 +794,8 @@ export const useWeddingStore = create<WeddingState>()(
             guests: snapshot.guests && snapshot.guests.length > 0 ? snapshot.guests : state.guests,
             gifts: snapshot.gifts && snapshot.gifts.length > 0 ? snapshot.gifts : state.gifts,
             documents: snapshot.documents && snapshot.documents.length > 0 ? snapshot.documents : state.documents,
+            moodboardItems:
+              snapshot.moodboardItems !== undefined ? snapshot.moodboardItems : state.moodboardItems,
           };
         }),
 
@@ -698,6 +811,7 @@ export const useWeddingStore = create<WeddingState>()(
           guests: initialGuests,
           gifts: initialGifts,
           documents: initialDocuments,
+          moodboardItems: [],
         }),
     }),
     {
