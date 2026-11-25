@@ -44,6 +44,7 @@ export default function DashboardScreen() {
   const guests = useWeddingStore((s) => s.guests);
   const documents = useWeddingStore((s) => s.documents);
   const updateProfile = useWeddingStore((s) => s.updateProfile);
+  const hydrateFromCloud = useWeddingStore((s) => s.hydrateFromCloud);
   const resetAllData = useWeddingStore((s) => s.resetAllData);
 
   // Settings & Cloud Sync Modal state
@@ -88,7 +89,8 @@ export default function DashboardScreen() {
       const res = await AuthService.loginWithEmail(loginEmail.trim(), loginPassword);
       if (res.user) {
         await CloudSyncService.fetchWorkspaceForUser(res.user.id);
-        setSyncMessage('Berhasil masuk ke workspace pasangan!');
+        const syncRes = await CloudSyncService.syncNow((snapshot) => hydrateFromCloud(snapshot));
+        setSyncMessage(syncRes.synced ? 'Berhasil masuk & data tersinkron!' : syncRes.message);
       }
     } catch (err: any) {
       setSyncMessage(err?.message || 'Gagal masuk. Periksa email dan kata sandi Anda.');
@@ -99,7 +101,7 @@ export default function DashboardScreen() {
 
   const handleSyncNow = async () => {
     setIsSyncing(true);
-    const result = await CloudSyncService.syncNow();
+    const result = await CloudSyncService.syncNow((snapshot) => hydrateFromCloud(snapshot));
     setSyncMessage(result.message);
     setIsSyncing(false);
   };

@@ -2,6 +2,15 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { subDays, format } from 'date-fns';
+import { CloudSyncService } from '../services/cloudSyncService';
+
+function generateUuid(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 export type TaskCategory = 'canonical' | 'civil' | 'liturgy' | 'vendor';
 export type TaskPriority = 'critical' | 'high' | 'medium' | 'low';
@@ -238,7 +247,17 @@ export interface WeddingState {
   updateDocument: (id: string, patch: Partial<DocumentItem>) => void;
   deleteDocument: (id: string) => void;
 
-  // Reset
+  // Cloud Hydration & Reset
+  hydrateFromCloud: (snapshot: {
+    workspace?: { wedding_date?: string } | null;
+    tasks?: ChecklistItem[];
+    categories?: CategoryItem[];
+    vendors?: VendorItem[];
+    transactions?: TransactionItem[];
+    guests?: GuestItem[];
+    gifts?: GiftItem[];
+    documents?: DocumentItem[];
+  }) => void;
   resetAllData: () => void;
 }
 
@@ -268,74 +287,104 @@ export const useWeddingStore = create<WeddingState>()(
                 return { ...t, dueDate: format(shifted, 'dd MMM yyyy') };
               });
             }
+            CloudSyncService.updateWorkspaceWeddingDate(patch.weddingDate).catch(() => {});
           }
           return { profile: nextProfile, tasks: nextTasks };
         }),
 
       // Tasks
       toggleTask: (id) =>
-        set((state) => ({
-          tasks: state.tasks.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)),
-        })),
+        set((state) => {
+          const nextTasks = state.tasks.map((t) =>
+            t.id === id ? { ...t, completed: !t.completed } : t
+          );
+          const updated = nextTasks.find((t) => t.id === id);
+          if (updated) CloudSyncService.pushTask(updated).catch(() => {});
+          return { tasks: nextTasks };
+        }),
       addTask: (task) =>
-        set((state) => ({
-          tasks: [{ ...task, id: Date.now().toString() }, ...state.tasks],
-        })),
+        set((state) => {
+          const created: ChecklistItem = { ...task, id: generateUuid() };
+          CloudSyncService.pushTask(created).catch(() => {});
+          return { tasks: [created, ...state.tasks] };
+        }),
       updateTask: (id, patch) =>
-        set((state) => ({
-          tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)),
-        })),
+        set((state) => {
+          const nextTasks = state.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t));
+          const updated = nextTasks.find((t) => t.id === id);
+          if (updated) CloudSyncService.pushTask(updated).catch(() => {});
+          return { tasks: nextTasks };
+        }),
       deleteTask: (id) =>
-        set((state) => ({
-          tasks: state.tasks.filter((t) => t.id !== id),
-        })),
+        set((state) => {
+          CloudSyncService.deleteTask(id).catch(() => {});
+          return { tasks: state.tasks.filter((t) => t.id !== id) };
+        }),
 
       // Categories
       addCategory: (cat) =>
-        set((state) => ({
-          categories: [...state.categories, { ...cat, id: Date.now().toString() }],
-        })),
+        set((state) => {
+          const created: CategoryItem = { ...cat, id: generateUuid() };
+          CloudSyncService.pushCategory(created).catch(() => {});
+          return { categories: [...state.categories, created] };
+        }),
       updateCategory: (id, patch) =>
-        set((state) => ({
-          categories: state.categories.map((c) => (c.id === id ? { ...c, ...patch } : c)),
-        })),
+        set((state) => {
+          const next = state.categories.map((c) => (c.id === id ? { ...c, ...patch } : c));
+          const updated = next.find((c) => c.id === id);
+          if (updated) CloudSyncService.pushCategory(updated).catch(() => {});
+          return { categories: next };
+        }),
       deleteCategory: (id) =>
-        set((state) => ({
-          categories: state.categories.filter((c) => c.id !== id),
-        })),
+        set((state) => {
+          CloudSyncService.deleteCategory(id).catch(() => {});
+          return { categories: state.categories.filter((c) => c.id !== id) };
+        }),
 
       // Vendors
       addVendor: (vendor) =>
-        set((state) => ({
-          vendors: [...state.vendors, { ...vendor, id: Date.now().toString() }],
-        })),
+        set((state) => {
+          const created: VendorItem = { ...vendor, id: generateUuid() };
+          CloudSyncService.pushVendor(created).catch(() => {});
+          return { vendors: [...state.vendors, created] };
+        }),
       updateVendor: (id, patch) =>
-        set((state) => ({
-          vendors: state.vendors.map((v) => (v.id === id ? { ...v, ...patch } : v)),
-        })),
+        set((state) => {
+          const next = state.vendors.map((v) => (v.id === id ? { ...v, ...patch } : v));
+          const updated = next.find((v) => v.id === id);
+          if (updated) CloudSyncService.pushVendor(updated).catch(() => {});
+          return { vendors: next };
+        }),
       deleteVendor: (id) =>
-        set((state) => ({
-          vendors: state.vendors.filter((v) => v.id !== id),
-        })),
+        set((state) => {
+          CloudSyncService.deleteVendor(id).catch(() => {});
+          return { vendors: state.vendors.filter((v) => v.id !== id) };
+        }),
 
       // Transactions
       addTransaction: (tx) =>
-        set((state) => ({
-          transactions: [{ ...tx, id: Date.now().toString() }, ...state.transactions],
-        })),
+        set((state) => {
+          const created: TransactionItem = { ...tx, id: generateUuid() };
+          CloudSyncService.pushTransaction(created).catch(() => {});
+          return { transactions: [created, ...state.transactions] };
+        }),
       updateTransaction: (id, patch) =>
-        set((state) => ({
-          transactions: state.transactions.map((tx) => (tx.id === id ? { ...tx, ...patch } : tx)),
-        })),
+        set((state) => {
+          const next = state.transactions.map((tx) => (tx.id === id ? { ...tx, ...patch } : tx));
+          const updated = next.find((tx) => tx.id === id);
+          if (updated) CloudSyncService.pushTransaction(updated).catch(() => {});
+          return { transactions: next };
+        }),
       deleteTransaction: (id) =>
-        set((state) => ({
-          transactions: state.transactions.filter((tx) => tx.id !== id),
-        })),
+        set((state) => {
+          CloudSyncService.deleteTransaction(id).catch(() => {});
+          return { transactions: state.transactions.filter((tx) => tx.id !== id) };
+        }),
 
       // Guests
       cycleGuestRsvp: (id) =>
-        set((state) => ({
-          guests: state.guests.map((g) => {
+        set((state) => {
+          const next = state.guests.map((g) => {
             if (g.id !== id) return g;
             const order: GuestItem['rsvpStatus'][] = ['attending', 'tentative', 'declined', 'pending'];
             const nextStatus = order[(order.indexOf(g.rsvpStatus) + 1) % order.length];
@@ -344,62 +393,104 @@ export const useWeddingStore = create<WeddingState>()(
               rsvpStatus: nextStatus,
               actualPax: nextStatus === 'attending' ? g.estimatedPax : 0,
             };
-          }),
-        })),
+          });
+          const updated = next.find((g) => g.id === id);
+          if (updated) CloudSyncService.pushGuest(updated).catch(() => {});
+          return { guests: next };
+        }),
       addGuest: (guest) =>
-        set((state) => ({
-          guests: [{ ...guest, id: Date.now().toString() }, ...state.guests],
-        })),
+        set((state) => {
+          const created: GuestItem = { ...guest, id: generateUuid() };
+          CloudSyncService.pushGuest(created).catch(() => {});
+          return { guests: [created, ...state.guests] };
+        }),
       updateGuest: (id, patch) =>
-        set((state) => ({
-          guests: state.guests.map((g) => (g.id === id ? { ...g, ...patch } : g)),
-        })),
+        set((state) => {
+          const next = state.guests.map((g) => (g.id === id ? { ...g, ...patch } : g));
+          const updated = next.find((g) => g.id === id);
+          if (updated) CloudSyncService.pushGuest(updated).catch(() => {});
+          return { guests: next };
+        }),
       deleteGuest: (id) =>
-        set((state) => ({
-          guests: state.guests.filter((g) => g.id !== id),
-        })),
+        set((state) => {
+          CloudSyncService.deleteGuest(id).catch(() => {});
+          return { guests: state.guests.filter((g) => g.id !== id) };
+        }),
 
       // Gifts
       toggleGiftThankYou: (id) =>
-        set((state) => ({
-          gifts: state.gifts.map((gf) =>
+        set((state) => {
+          const next = state.gifts.map((gf) =>
             gf.id === id ? { ...gf, thankYouSent: !gf.thankYouSent } : gf
-          ),
-        })),
+          );
+          const updated = next.find((gf) => gf.id === id);
+          if (updated) CloudSyncService.pushGift(updated).catch(() => {});
+          return { gifts: next };
+        }),
       addGift: (gift) =>
-        set((state) => ({
-          gifts: [{ ...gift, id: Date.now().toString() }, ...state.gifts],
-        })),
+        set((state) => {
+          const created: GiftItem = { ...gift, id: generateUuid() };
+          CloudSyncService.pushGift(created).catch(() => {});
+          return { gifts: [created, ...state.gifts] };
+        }),
       updateGift: (id, patch) =>
-        set((state) => ({
-          gifts: state.gifts.map((gf) => (gf.id === id ? { ...gf, ...patch } : gf)),
-        })),
+        set((state) => {
+          const next = state.gifts.map((gf) => (gf.id === id ? { ...gf, ...patch } : gf));
+          const updated = next.find((gf) => gf.id === id);
+          if (updated) CloudSyncService.pushGift(updated).catch(() => {});
+          return { gifts: next };
+        }),
       deleteGift: (id) =>
-        set((state) => ({
-          gifts: state.gifts.filter((gf) => gf.id !== id),
-        })),
+        set((state) => {
+          CloudSyncService.deleteGift(id).catch(() => {});
+          return { gifts: state.gifts.filter((gf) => gf.id !== id) };
+        }),
 
       // Documents
       cycleDocumentStatus: (id) =>
-        set((state) => ({
-          documents: state.documents.map((d) => {
+        set((state) => {
+          const next = state.documents.map((d) => {
             if (d.id !== id) return d;
             const order: DocumentItem['status'][] = ['verified', 'pending', 'expired'];
             const nextStatus = order[(order.indexOf(d.status) + 1) % order.length];
             return { ...d, status: nextStatus };
-          }),
-        })),
+          });
+          const updated = next.find((d) => d.id === id);
+          if (updated) CloudSyncService.pushDocument(updated).catch(() => {});
+          return { documents: next };
+        }),
       addDocument: (doc) =>
-        set((state) => ({
-          documents: [{ ...doc, id: Date.now().toString() }, ...state.documents],
-        })),
+        set((state) => {
+          const created: DocumentItem = { ...doc, id: generateUuid() };
+          CloudSyncService.pushDocument(created).catch(() => {});
+          return { documents: [created, ...state.documents] };
+        }),
       updateDocument: (id, patch) =>
-        set((state) => ({
-          documents: state.documents.map((d) => (d.id === id ? { ...d, ...patch } : d)),
-        })),
+        set((state) => {
+          const next = state.documents.map((d) => (d.id === id ? { ...d, ...patch } : d));
+          const updated = next.find((d) => d.id === id);
+          if (updated) CloudSyncService.pushDocument(updated).catch(() => {});
+          return { documents: next };
+        }),
       deleteDocument: (id) =>
+        set((state) => {
+          CloudSyncService.deleteDocument(id).catch(() => {});
+          return { documents: state.documents.filter((d) => d.id !== id) };
+        }),
+
+      // Cloud Hydration (updates store from Supabase without re-triggering push)
+      hydrateFromCloud: (snapshot) =>
         set((state) => ({
-          documents: state.documents.filter((d) => d.id !== id),
+          profile: snapshot.workspace?.wedding_date
+            ? { ...state.profile, weddingDate: `${snapshot.workspace.wedding_date.slice(0, 10)}T00:00:00.000Z` }
+            : state.profile,
+          tasks: snapshot.tasks && snapshot.tasks.length > 0 ? snapshot.tasks : state.tasks,
+          categories: snapshot.categories && snapshot.categories.length > 0 ? snapshot.categories : state.categories,
+          vendors: snapshot.vendors && snapshot.vendors.length > 0 ? snapshot.vendors : state.vendors,
+          transactions: snapshot.transactions && snapshot.transactions.length > 0 ? snapshot.transactions : state.transactions,
+          guests: snapshot.guests && snapshot.guests.length > 0 ? snapshot.guests : state.guests,
+          gifts: snapshot.gifts && snapshot.gifts.length > 0 ? snapshot.gifts : state.gifts,
+          documents: snapshot.documents && snapshot.documents.length > 0 ? snapshot.documents : state.documents,
         })),
 
       // Reset
