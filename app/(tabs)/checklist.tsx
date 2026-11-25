@@ -55,6 +55,21 @@ function formatOffsetLabel(offsetDays: number): string {
   return offsetDays < 0 ? `H${offsetDays}` : `H+${offsetDays}`;
 }
 
+const availableCategoryIcons: { name: string; label: string }[] = [
+  { name: 'ribbon-outline', label: 'Pita' },
+  { name: 'document-text-outline', label: 'Dokumen' },
+  { name: 'musical-notes-outline', label: 'Musik' },
+  { name: 'storefront-outline', label: 'Vendor' },
+  { name: 'heart-outline', label: 'Cinta' },
+  { name: 'sparkles-outline', label: 'MUA/Rias' },
+  { name: 'camera-outline', label: 'Foto' },
+  { name: 'restaurant-outline', label: 'Katering' },
+  { name: 'gift-outline', label: 'Hadiah' },
+  { name: 'car-sport-outline', label: 'Mobil' },
+  { name: 'flower-outline', label: 'Dekorasi' },
+  { name: 'bookmark-outline', label: 'Lainnya' },
+];
+
 export default function ChecklistScreen() {
   const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
@@ -92,12 +107,14 @@ export default function ChecklistScreen() {
 
   // Quick inline category add inside task modal
   const [inlineNewCat, setInlineNewCat] = useState('');
+  const [inlineCatIcon, setInlineCatIcon] = useState<string>('ribbon-outline');
   const [showInlineCatInput, setShowInlineCatInput] = useState(false);
 
   // Category Management Modal State
   const [catModalVisible, setCatModalVisible] = useState(false);
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [catInputName, setCatInputName] = useState('');
+  const [catInputIcon, setCatInputIcon] = useState<string>('ribbon-outline');
 
   const categoryLabels = ['Semua', ...taskCategories.map((c) => c.label)];
   const categoryKeys = ['all', ...taskCategories.map((c) => c.key)];
@@ -122,6 +139,7 @@ export default function ChecklistScreen() {
     setShowCalendar(false);
     setShowInlineCatInput(false);
     setInlineNewCat('');
+    setInlineCatIcon('ribbon-outline');
     setModalVisible(true);
   };
 
@@ -152,9 +170,10 @@ export default function ChecklistScreen() {
     const trimmed = inlineNewCat.trim();
     if (!trimmed) return;
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    const created = addTaskCategory(trimmed);
+    const created = addTaskCategory(trimmed, inlineCatIcon);
     setFormCategory(created.key);
     setInlineNewCat('');
+    setInlineCatIcon('ribbon-outline');
     setShowInlineCatInput(false);
   };
 
@@ -203,6 +222,7 @@ export default function ChecklistScreen() {
   const openCategoryManager = () => {
     setEditingCatId(null);
     setCatInputName('');
+    setCatInputIcon('ribbon-outline');
     setCatModalVisible(true);
   };
 
@@ -211,17 +231,19 @@ export default function ChecklistScreen() {
     if (!trimmed) return;
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     if (editingCatId) {
-      updateTaskCategory(editingCatId, trimmed);
+      updateTaskCategory(editingCatId, trimmed, catInputIcon);
       setEditingCatId(null);
     } else {
-      addTaskCategory(trimmed);
+      addTaskCategory(trimmed, catInputIcon);
     }
     setCatInputName('');
+    setCatInputIcon('ribbon-outline');
   };
 
   const startEditCategory = (cat: TaskCategoryItem) => {
     setEditingCatId(cat.id);
     setCatInputName(cat.label);
+    setCatInputIcon(cat.icon || 'ribbon-outline');
   };
 
   const handleDeleteCategory = (id: string) => {
@@ -239,7 +261,11 @@ export default function ChecklistScreen() {
     selectedCategoryIndex < categoryKeys.length ? selectedCategoryIndex : 0;
   const activeCategoryKey = categoryKeys[safeCategoryIndex];
   const filteredTasks = tasks.filter((t) => {
-    const matchesCategory = activeCategoryKey === 'all' || t.category === activeCategoryKey;
+    const activeCat = taskCategories[safeCategoryIndex - 1]; // because index 0 is 'all'
+    const matchesCategory =
+      activeCategoryKey === 'all' ||
+      t.category === activeCategoryKey ||
+      (activeCat && (t.category === activeCat.id || t.category === activeCat.key));
     const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
@@ -452,9 +478,10 @@ export default function ChecklistScreen() {
 
                   <View style={styles.catGrid}>
                     {taskCategories.map((cat) => {
-                      const count = tasks.filter((t) => t.category === cat.key).length;
+                      const count = tasks.filter((t) => t.category === cat.key || t.category === cat.id).length;
                       const iconName =
-                        cat.key === 'canonical'
+                        cat.icon ||
+                        (cat.key === 'canonical'
                           ? 'ribbon-outline'
                           : cat.key === 'civil'
                           ? 'document-text-outline'
@@ -462,7 +489,7 @@ export default function ChecklistScreen() {
                           ? 'musical-notes-outline'
                           : cat.key === 'vendor'
                           ? 'storefront-outline'
-                          : 'bookmark-outline';
+                          : 'bookmark-outline');
 
                       return (
                         <TouchableOpacity
@@ -506,24 +533,53 @@ export default function ChecklistScreen() {
                   </View>
 
                   {showInlineCatInput ? (
-                    <View style={[styles.inlineCatRow, { marginTop: 12 }]}>
-                      <TextInput
-                        placeholder="Nama kategori baru..."
-                        placeholderTextColor={colors.textMuted}
-                        value={inlineNewCat}
-                        onChangeText={setInlineNewCat}
-                        style={[styles.modalInput, { flex: 1, marginBottom: 0 }]}
-                      />
-                      <TouchableOpacity
-                        onPress={() => {
-                          handleInlineAddCategory();
-                          setModalStep('form');
-                        }}
-                        style={styles.inlineCatSaveBtn}
-                        activeOpacity={0.8}
+                    <View style={styles.inlineCatContainer}>
+                      <Text style={styles.iconPickerHeader}>Pilih Ikon Kategori:</Text>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.iconPickerScroll}
                       >
-                        <Text style={styles.inlineCatSaveText}>Lanjut</Text>
-                      </TouchableOpacity>
+                        {availableCategoryIcons.map((ic) => {
+                          const isSelected = inlineCatIcon === ic.name;
+                          return (
+                            <TouchableOpacity
+                              key={ic.name}
+                              onPress={() => setInlineCatIcon(ic.name)}
+                              style={[
+                                styles.iconChoiceBtn,
+                                isSelected && styles.iconChoiceBtnActive,
+                              ]}
+                            >
+                              <Ionicons
+                                name={ic.name}
+                                size={20}
+                                color={isSelected ? colors.textLight : colors.accent}
+                              />
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+
+                      <View style={[styles.inlineCatRow, { marginTop: 8 }]}>
+                        <TextInput
+                          placeholder="Nama kategori baru..."
+                          placeholderTextColor={colors.textMuted}
+                          value={inlineNewCat}
+                          onChangeText={setInlineNewCat}
+                          style={[styles.modalInput, { flex: 1, marginBottom: 0 }]}
+                        />
+                        <TouchableOpacity
+                          onPress={() => {
+                            handleInlineAddCategory();
+                            setModalStep('form');
+                          }}
+                          style={styles.inlineCatSaveBtn}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={styles.inlineCatSaveText}>Lanjut</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   ) : null}
                 </View>
@@ -696,47 +752,84 @@ export default function ChecklistScreen() {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.inlineCatRow}>
-              <TextInput
-                placeholder={editingCatId ? 'Ubah nama kategori...' : 'Tambah kategori baru...'}
-                placeholderTextColor={colors.textMuted}
-                value={catInputName}
-                onChangeText={setCatInputName}
-                style={[styles.modalInput, { flex: 1, marginBottom: 0 }]}
-              />
-              <TouchableOpacity
-                onPress={handleSaveCategory}
-                style={styles.inlineCatSaveBtn}
-                activeOpacity={0.8}
+            <View style={styles.catInputBlock}>
+              <Text style={styles.iconPickerHeader}>Pilih Ikon:</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.iconPickerScroll}
               >
-                <Text style={styles.inlineCatSaveText}>
-                  {editingCatId ? 'Simpan' : 'Tambah'}
-                </Text>
-              </TouchableOpacity>
+                {availableCategoryIcons.map((ic) => {
+                  const isSelected = catInputIcon === ic.name;
+                  return (
+                    <TouchableOpacity
+                      key={ic.name}
+                      onPress={() => setCatInputIcon(ic.name)}
+                      style={[
+                        styles.iconChoiceBtn,
+                        isSelected && styles.iconChoiceBtnActive,
+                      ]}
+                    >
+                      <Ionicons
+                        name={ic.name}
+                        size={20}
+                        color={isSelected ? colors.textLight : colors.accent}
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={[styles.inlineCatRow, { marginTop: 10 }]}>
+                <TextInput
+                  placeholder={editingCatId ? 'Ubah nama kategori...' : 'Tambah kategori baru...'}
+                  placeholderTextColor={colors.textMuted}
+                  value={catInputName}
+                  onChangeText={setCatInputName}
+                  style={[styles.modalInput, { flex: 1, marginBottom: 0 }]}
+                />
+                <TouchableOpacity
+                  onPress={handleSaveCategory}
+                  style={styles.inlineCatSaveBtn}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.inlineCatSaveText}>
+                    {editingCatId ? 'Simpan' : 'Tambah'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
-            <ScrollView style={{ maxHeight: 280, marginTop: 12 }}>
-              {taskCategories.map((cat) => (
-                <View key={cat.id} style={styles.catManageRow}>
-                  <Text style={styles.catManageLabel}>{cat.label}</Text>
-                  <View style={styles.catManageActions}>
-                    <TouchableOpacity
-                      onPress={() => startEditCategory(cat)}
-                      style={styles.catIconBtn}
-                    >
-                      <Ionicons name="create-outline" size={17} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                    {taskCategories.length > 1 ? (
+            <ScrollView style={{ maxHeight: 280, marginTop: 14 }}>
+              {taskCategories.map((cat) => {
+                const iconName = cat.icon || 'bookmark-outline';
+                return (
+                  <View key={cat.id} style={styles.catManageRow}>
+                    <View style={styles.catManageLeft}>
+                      <View style={styles.catManageIconCircle}>
+                        <Ionicons name={iconName as any} size={16} color={colors.accent} />
+                      </View>
+                      <Text style={styles.catManageLabel}>{cat.label}</Text>
+                    </View>
+                    <View style={styles.catManageActions}>
                       <TouchableOpacity
-                        onPress={() => handleDeleteCategory(cat.id)}
+                        onPress={() => startEditCategory(cat)}
                         style={styles.catIconBtn}
                       >
-                        <Ionicons name="trash-outline" size={17} color={colors.danger} />
+                        <Ionicons name="create-outline" size={17} color={colors.textSecondary} />
                       </TouchableOpacity>
-                    ) : null}
+                      {taskCategories.length > 1 ? (
+                        <TouchableOpacity
+                          onPress={() => handleDeleteCategory(cat.id)}
+                          style={styles.catIconBtn}
+                        >
+                          <Ionicons name="trash-outline" size={17} color={colors.danger} />
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
@@ -1172,6 +1265,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
+  catManageLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  catManageIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: `${colors.accent}15`,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   catManageLabel: {
     fontSize: 14,
     fontWeight: '600',
@@ -1183,5 +1290,46 @@ const styles = StyleSheet.create({
   },
   catIconBtn: {
     padding: 4,
+  },
+  inlineCatContainer: {
+    marginTop: 12,
+    backgroundColor: colors.cardBg,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  catInputBlock: {
+    backgroundColor: colors.cardBg,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  iconPickerHeader: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: 6,
+  },
+  iconPickerScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  iconChoiceBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconChoiceBtnActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
 });

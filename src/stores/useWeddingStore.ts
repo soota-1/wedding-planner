@@ -20,6 +20,7 @@ export interface TaskCategoryItem {
   id: string;
   key: string;
   label: string;
+  icon?: string;
 }
 
 export interface ChecklistItem {
@@ -106,10 +107,10 @@ const DEFAULT_PROFILE: WeddingProfile = {
 };
 
 const initialTaskCategories: TaskCategoryItem[] = [
-  { id: 'cat-canonical', key: 'canonical', label: 'Kanonik & KPP' },
-  { id: 'cat-civil', key: 'civil', label: 'Sipil' },
-  { id: 'cat-liturgy', key: 'liturgy', label: 'Liturgi' },
-  { id: 'cat-vendor', key: 'vendor', label: 'Vendor' },
+  { id: 'cat-canonical', key: 'canonical', label: 'Kanonik & KPP', icon: 'ribbon-outline' },
+  { id: 'cat-civil', key: 'civil', label: 'Sipil', icon: 'document-text-outline' },
+  { id: 'cat-liturgy', key: 'liturgy', label: 'Liturgi', icon: 'musical-notes-outline' },
+  { id: 'cat-vendor', key: 'vendor', label: 'Vendor', icon: 'storefront-outline' },
 ];
 
 const initialTasks: ChecklistItem[] = [
@@ -231,8 +232,8 @@ export interface WeddingState {
   updateProfile: (patch: Partial<WeddingProfile>) => void;
 
   // Task Category actions
-  addTaskCategory: (label: string) => TaskCategoryItem;
-  updateTaskCategory: (id: string, label: string) => void;
+  addTaskCategory: (label: string, icon?: string) => TaskCategoryItem;
+  updateTaskCategory: (id: string, label: string, icon?: string) => void;
   deleteTaskCategory: (id: string) => void;
 
   // Task actions
@@ -271,6 +272,7 @@ export interface WeddingState {
   // Cloud Hydration & Reset
   hydrateFromCloud: (snapshot: {
     workspace?: { wedding_date?: string } | null;
+    taskCategories?: TaskCategoryItem[];
     tasks?: ChecklistItem[];
     categories?: CategoryItem[];
     vendors?: VendorItem[];
@@ -317,30 +319,41 @@ export const useWeddingStore = create<WeddingState>()(
         }),
 
       // Task Categories
-      addTaskCategory: (label) => {
+      addTaskCategory: (label, icon) => {
         const trimmed = label.trim();
-        const key = `${trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_${Date.now().toString().slice(-4)}`;
-        const created: TaskCategoryItem = { id: generateUuid(), key, label: trimmed };
+        const id = generateUuid();
+        const created: TaskCategoryItem = { id, key: id, label: trimmed, icon: icon || 'bookmark-outline' };
         set((state) => ({
           taskCategories: [...state.taskCategories, created],
         }));
+        CloudSyncService.pushTaskCategory(created).catch(() => {});
         return created;
       },
-      updateTaskCategory: (id, label) =>
-        set((state) => ({
-          taskCategories: state.taskCategories.map((c) =>
-            c.id === id ? { ...c, label: label.trim() || c.label } : c
-          ),
-        })),
+      updateTaskCategory: (id, label, icon) =>
+        set((state) => {
+          const next = state.taskCategories.map((c) =>
+            c.id === id
+              ? {
+                  ...c,
+                  label: label.trim() || c.label,
+                  icon: icon !== undefined ? icon : c.icon,
+                }
+              : c
+          );
+          const updated = next.find((c) => c.id === id);
+          if (updated) CloudSyncService.pushTaskCategory(updated).catch(() => {});
+          return { taskCategories: next };
+        }),
       deleteTaskCategory: (id) =>
         set((state) => {
           const target = state.taskCategories.find((c) => c.id === id);
           const remaining = state.taskCategories.filter((c) => c.id !== id);
           const fallbackKey = remaining[0]?.key || 'canonical';
+          CloudSyncService.deleteTaskCategory(id).catch(() => {});
           return {
             taskCategories: remaining,
             tasks: target
-              ? state.tasks.map((t) => (t.category === target.key ? { ...t, category: fallbackKey } : t))
+              ? state.tasks.map((t) => (t.category === target.key || t.category === target.id ? { ...t, category: fallbackKey } : t))
               : state.tasks,
           };
         }),
@@ -533,18 +546,36 @@ export const useWeddingStore = create<WeddingState>()(
 
       // Cloud Hydration (updates store from Supabase without re-triggering push)
       hydrateFromCloud: (snapshot) =>
-        set((state) => ({
-          profile: snapshot.workspace?.wedding_date
-            ? { ...state.profile, weddingDate: `${snapshot.workspace.wedding_date.slice(0, 10)}T00:00:00.000Z` }
-            : state.profile,
-          tasks: snapshot.tasks && snapshot.tasks.length > 0 ? snapshot.tasks : state.tasks,
-          categories: snapshot.categories && snapshot.categories.length > 0 ? snapshot.categories : state.categories,
-          vendors: snapshot.vendors && snapshot.vendors.length > 0 ? snapshot.vendors : state.vendors,
-          transactions: snapshot.transactions && snapshot.transactions.length > 0 ? snapshot.transactions : state.transactions,
-          guests: snapshot.guests && snapshot.guests.length > 0 ? snapshot.guests : state.guests,
-          gifts: snapshot.gifts && snapshot.gifts.length > 0 ? snapshot.gifts : state.gifts,
-          documents: snapshot.documents && snapshot.documents.length > 0 ? snapshot.documents : state.documents,
-        })),
+        set((state) => {
+          let mergedCategories = state.taskCategories;
+          if (snapshot.taskCategories && snapshot.taskCategories.length > 0) {
+            // Merge defaults and cloud categories, avoiding duplicates by id or key
+            const cloudCatMap = new Map<string, TaskCategoryItem>();
+            snapshot.taskCategories.forEach((c) => {
+              cloudCatMap.set(c.id, c);
+              cloudCatMap.set(c.key, c);
+            });
+            // Keep existing defaults if not present
+            const existingNonCloud = state.taskCategories.filter(
+              (c) => !cloudCatMap.has(c.id) && !cloudCatMap.has(c.key)
+            );
+            mergedCategories = [...existingNonCloud, ...snapshot.taskCategories];
+          }
+
+          return {
+            profile: snapshot.workspace?.wedding_date
+              ? { ...state.profile, weddingDate: `${snapshot.workspace.wedding_date.slice(0, 10)}T00:00:00.000Z` }
+              : state.profile,
+            taskCategories: mergedCategories,
+            tasks: snapshot.tasks && snapshot.tasks.length > 0 ? snapshot.tasks : state.tasks,
+            categories: snapshot.categories && snapshot.categories.length > 0 ? snapshot.categories : state.categories,
+            vendors: snapshot.vendors && snapshot.vendors.length > 0 ? snapshot.vendors : state.vendors,
+            transactions: snapshot.transactions && snapshot.transactions.length > 0 ? snapshot.transactions : state.transactions,
+            guests: snapshot.guests && snapshot.guests.length > 0 ? snapshot.guests : state.guests,
+            gifts: snapshot.gifts && snapshot.gifts.length > 0 ? snapshot.gifts : state.gifts,
+            documents: snapshot.documents && snapshot.documents.length > 0 ? snapshot.documents : state.documents,
+          };
+        }),
 
       // Reset
       resetAllData: () =>

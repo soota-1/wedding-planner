@@ -86,16 +86,17 @@ describe('useWeddingStore (Phase 4 Unified Store & Persistence)', () => {
     expect(useWeddingStore.getState().documents[0].title).toBe('Surat Keterangan Belum Menikah');
   });
 
-  it('supports adding, editing, and deleting checklist task categories', () => {
+  it('supports adding, editing, and deleting checklist task categories with icons', () => {
     const initialCatCount = useWeddingStore.getState().taskCategories.length;
-    const created = useWeddingStore.getState().addTaskCategory('Seserahan');
+    const created = useWeddingStore.getState().addTaskCategory('Seserahan', 'gift-outline');
     expect(useWeddingStore.getState().taskCategories.length).toBe(initialCatCount + 1);
     expect(created.label).toBe('Seserahan');
+    expect(created.icon).toBe('gift-outline');
 
-    useWeddingStore.getState().updateTaskCategory(created.id, 'Seserahan & Hantaran');
-    expect(
-      useWeddingStore.getState().taskCategories.find((c) => c.id === created.id)?.label
-    ).toBe('Seserahan & Hantaran');
+    useWeddingStore.getState().updateTaskCategory(created.id, 'Seserahan & Hantaran', 'flower-outline');
+    const updated = useWeddingStore.getState().taskCategories.find((c) => c.id === created.id);
+    expect(updated?.label).toBe('Seserahan & Hantaran');
+    expect(updated?.icon).toBe('flower-outline');
 
     useWeddingStore.getState().deleteTaskCategory(created.id);
     expect(useWeddingStore.getState().taskCategories.length).toBe(initialCatCount);

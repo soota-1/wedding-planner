@@ -4,6 +4,7 @@ import { useAuthStore, Workspace } from '../stores/useAuthStore';
 import { subscribeToWorkspaceChanges } from './realtimeSync';
 import type {
   ChecklistItem,
+  TaskCategoryItem,
   CategoryItem,
   VendorItem,
   TransactionItem,
@@ -95,10 +96,11 @@ export class CloudSyncService {
   }
 
   static async pullWorkspaceSnapshot(workspaceId: string) {
-    const [wsRes, tasksRes, catsRes, vendorsRes, txRes, guestsRes, giftsRes, docsRes] =
+    const [wsRes, tasksRes, taskCatsRes, catsRes, vendorsRes, txRes, guestsRes, giftsRes, docsRes] =
       await Promise.all([
         supabase.from('workspaces').select('*').eq('id', workspaceId).single(),
         supabase.from('tasks').select('*').eq('workspace_id', workspaceId),
+        supabase.from('checklist_categories').select('*').eq('workspace_id', workspaceId).order('sort_order', { ascending: true }),
         supabase.from('budget_categories').select('*').eq('workspace_id', workspaceId),
         supabase.from('vendors').select('*').eq('workspace_id', workspaceId),
         supabase.from('transactions').select('*').eq('workspace_id', workspaceId),
@@ -107,23 +109,36 @@ export class CloudSyncService {
         supabase.from('wedding_documents').select('*').eq('workspace_id', workspaceId),
       ]);
 
-    const mappedTasks: ChecklistItem[] = (tasksRes.data || []).map((t: any) => ({
-      id: t.id,
-      title: t.title,
-      category:
-        t.title?.toLowerCase().includes('sipil') || t.title?.toLowerCase().includes('disdukcapil')
-          ? 'civil'
-          : t.title?.toLowerCase().includes('liturgi') || t.title?.toLowerCase().includes('misa')
-          ? 'liturgy'
-          : t.title?.toLowerCase().includes('vendor') || t.title?.toLowerCase().includes('katering')
-          ? 'vendor'
-          : 'canonical',
-      dueDate: formatDbDate(t.due_date),
-      offsetDays: typeof t.offset_days === 'number' ? t.offset_days : -30,
-      priority: t.priority || 'medium',
-      pic: 'both',
-      completed: t.status === 'done',
+    const mappedTaskCategories: TaskCategoryItem[] = (taskCatsRes.data || []).map((c: any) => ({
+      id: c.id,
+      key: c.id,
+      label: c.name,
+      icon: c.icon || 'bookmark-outline',
     }));
+
+    const mappedTasks: ChecklistItem[] = (tasksRes.data || []).map((t: any) => {
+      let resolvedCategory = t.category_id || 'canonical';
+      if (!t.category_id) {
+        resolvedCategory =
+          t.title?.toLowerCase().includes('sipil') || t.title?.toLowerCase().includes('disdukcapil')
+            ? 'civil'
+            : t.title?.toLowerCase().includes('liturgi') || t.title?.toLowerCase().includes('misa')
+            ? 'liturgy'
+            : t.title?.toLowerCase().includes('vendor') || t.title?.toLowerCase().includes('katering')
+            ? 'vendor'
+            : 'canonical';
+      }
+      return {
+        id: t.id,
+        title: t.title,
+        category: resolvedCategory,
+        dueDate: formatDbDate(t.due_date),
+        offsetDays: typeof t.offset_days === 'number' ? t.offset_days : -30,
+        priority: t.priority || 'medium',
+        pic: 'both',
+        completed: t.status === 'done',
+      };
+    });
 
     const mappedCategories: CategoryItem[] = (catsRes.data || []).map((c: any) => ({
       id: c.id,
@@ -190,6 +205,7 @@ export class CloudSyncService {
 
     return {
       workspace: wsRes.data || null,
+      taskCategories: mappedTaskCategories,
       tasks: mappedTasks,
       categories: mappedCategories,
       vendors: mappedVendors,
@@ -259,9 +275,11 @@ export class CloudSyncService {
   static async pushTask(task: ChecklistItem): Promise<void> {
     const ctx = getActiveSyncContext();
     if (!ctx || !isValidUuid(task.id)) return;
+    const categoryId = isValidUuid(task.category) ? task.category : null;
     await supabase.from('tasks').upsert({
       id: task.id,
       workspace_id: ctx.workspaceId,
+      category_id: categoryId,
       title: task.title,
       status: task.completed ? 'done' : 'todo',
       priority: task.priority,
@@ -275,6 +293,27 @@ export class CloudSyncService {
     const ctx = getActiveSyncContext();
     if (!ctx || !isValidUuid(id)) return;
     await supabase.from('tasks').delete().eq('id', id).eq('workspace_id', ctx.workspaceId);
+  }
+
+  static async pushTaskCategory(cat: TaskCategoryItem): Promise<void> {
+    const ctx = getActiveSyncContext();
+    if (!ctx || !isValidUuid(cat.id)) return;
+    await supabase.from('checklist_categories').upsert({
+      id: cat.id,
+      workspace_id: ctx.workspaceId,
+      name: cat.label,
+      icon: cat.icon || 'bookmark-outline',
+    });
+  }
+
+  static async deleteTaskCategory(id: string): Promise<void> {
+    const ctx = getActiveSyncContext();
+    if (!ctx || !isValidUuid(id)) return;
+    await supabase
+      .from('checklist_categories')
+      .delete()
+      .eq('id', id)
+      .eq('workspace_id', ctx.workspaceId);
   }
 
   static async pushCategory(cat: CategoryItem): Promise<void> {

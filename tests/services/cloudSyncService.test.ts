@@ -19,11 +19,18 @@ describe('CloudSyncService (Phase 5 & 6A)', () => {
   it('hydrates useWeddingStore from cloud snapshot', () => {
     useWeddingStore.getState().hydrateFromCloud({
       workspace: { wedding_date: '2027-12-25' },
+      taskCategories: [
+        {
+          id: '55555555-4444-4444-4444-444444444444',
+          key: '55555555-4444-4444-4444-444444444444',
+          label: 'Seserahan & Lamaran',
+        },
+      ],
       tasks: [
         {
           id: '11111111-1111-1111-1111-111111111111',
           title: 'Cloud Task',
-          category: 'canonical',
+          category: '55555555-4444-4444-4444-444444444444',
           dueDate: '01 Des 2027',
           offsetDays: -24,
           priority: 'high',
@@ -34,6 +41,9 @@ describe('CloudSyncService (Phase 5 & 6A)', () => {
     });
     expect(useWeddingStore.getState().profile.weddingDate).toBe('2027-12-25T00:00:00.000Z');
     expect(useWeddingStore.getState().tasks[0].title).toBe('Cloud Task');
+    expect(
+      useWeddingStore.getState().taskCategories.some((c) => c.label === 'Seserahan & Lamaran')
+    ).toBe(true);
   });
 
   it('returns not_configured when using mock or empty Supabase env', async () => {
@@ -67,7 +77,11 @@ describe('CloudSyncService (Phase 5 & 6A)', () => {
     expect(useAuthStore.getState().activeWorkspace?.name).toBe('Octa & Jenesia Wedding');
   });
 
-  it('pulls workspace snapshot across all 7 tables', async () => {
+  it('pulls workspace snapshot across all tables including checklist categories', async () => {
+    const mockOrder = jest.fn().mockResolvedValue({
+      data: [{ id: 'cat-1', name: 'Seserahan' }],
+      error: null,
+    });
     const mockEq = jest.fn(() => {
       const p: any = Promise.resolve({
         data: [{ id: 'row-1', title: 'Test', name: 'Test', sender_name: 'Test' }],
@@ -77,6 +91,7 @@ describe('CloudSyncService (Phase 5 & 6A)', () => {
         data: { id: 'ws-123', wedding_date: '2027-10-10' },
         error: null,
       });
+      p.order = mockOrder;
       return p;
     });
     const mockSelect = jest.fn(() => ({ eq: mockEq }));
@@ -84,6 +99,8 @@ describe('CloudSyncService (Phase 5 & 6A)', () => {
 
     const snapshot = await CloudSyncService.pullWorkspaceSnapshot('ws-123');
     expect(snapshot.workspace?.id).toBe('ws-123');
+    expect(snapshot.taskCategories.length).toBe(1);
+    expect(snapshot.taskCategories[0].label).toBe('Seserahan');
     expect(snapshot.tasks.length).toBe(1);
     expect(snapshot.guests.length).toBe(1);
     expect(snapshot.documents.length).toBe(1);
