@@ -103,6 +103,7 @@ export default function RootLayout() {
             <Stack.Screen name="login" options={{ headerShown: false, animation: 'fade' }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="timeline" options={{ headerShown: false }} />
+            <Stack.Screen name="moodboard" options={{ headerShown: false }} />
           </Stack>
         </View>
       </SafeAreaProvider>
