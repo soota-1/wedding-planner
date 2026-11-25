@@ -28,6 +28,8 @@ declare module 'react-native' {
   export const Dimensions: any;
   export const Linking: any;
   export const Alert: any;
+  export const Share: any;
+  export const ActivityIndicator: any;
   export default RN;
 }
 

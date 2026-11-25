@@ -32,7 +32,8 @@
           "color": "#9E5A47",
           "defaultChannel": "wedding-reminders"
         }
-      ]
+      ],
+      "expo-sharing"
     ]
   }
 }

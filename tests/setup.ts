@@ -83,6 +83,18 @@ jest.mock('react-native', () => {
     Dimensions: {
       get: () => ({ width: 414, height: 896 }),
     },
+    ActivityIndicator: ({ ...props }: any) =>
+      reactModule.createElement('ActivityIndicator', props),
+    Linking: {
+      openURL: jest.fn().mockResolvedValue(true),
+      canOpenURL: jest.fn().mockResolvedValue(true),
+    },
+    Alert: {
+      alert: jest.fn(),
+    },
+    Share: {
+      share: jest.fn().mockResolvedValue({ action: 'sharedAction' }),
+    },
   };
 });
 
@@ -104,6 +116,36 @@ jest.mock('expo-notifications', () => ({
   cancelScheduledNotificationAsync: jest.fn().mockResolvedValue(undefined),
   AndroidImportance: { MAX: 5, HIGH: 4, DEFAULT: 3 },
   SchedulableTriggerInputTypes: { DATE: 'date', TIME_INTERVAL: 'timeInterval' },
+}));
+
+// Expo Moodboard Mocks for Jest
+jest.mock('expo-image-picker', () => ({
+  requestMediaLibraryPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+  launchImageLibraryAsync: jest.fn().mockResolvedValue({
+    canceled: false,
+    assets: [{ uri: 'file:///mock-gallery/photo.jpg' }],
+  }),
+  MediaTypeOptions: { Images: 'Images' },
+}));
+
+jest.mock('expo-sharing', () => ({
+  isAvailableAsync: jest.fn().mockResolvedValue(true),
+  shareAsync: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('expo-print', () => ({
+  printToFileAsync: jest.fn().mockResolvedValue({ uri: 'file:///mock-print/brief.pdf' }),
+}));
+
+jest.mock('expo-file-system', () => ({
+  cacheDirectory: 'file:///mock-cache/',
+  downloadAsync: jest.fn().mockResolvedValue({ uri: 'file:///mock-cache/downloaded.jpg' }),
+  readAsStringAsync: jest.fn().mockResolvedValue('bW9jay1iYXNlNjQ='),
+  EncodingType: { Base64: 'base64' },
+}));
+
+jest.mock('expo-clipboard', () => ({
+  setStringAsync: jest.fn().mockResolvedValue(true),
 }));
 
 // Expo Router Mocks for Jest
