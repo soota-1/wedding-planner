@@ -62,6 +62,7 @@ export default function RootLayout() {
             }}
           >
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="timeline" options={{ headerShown: false }} />
           </Stack>
         </View>
       </SafeAreaProvider>

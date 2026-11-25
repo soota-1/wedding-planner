@@ -321,7 +321,7 @@ export default function DashboardScreen() {
                 <Ionicons name="calendar-outline" size={18} color={colors.accent} />
                 <Text style={styles.sectionTitle}>Agenda Terdekat</Text>
               </View>
-              <TouchableOpacity onPress={() => router.push('/checklist')} activeOpacity={0.7}>
+              <TouchableOpacity onPress={() => router.push('/timeline')} activeOpacity={0.7}>
                 <Text style={styles.linkText}>Lihat Semua</Text>
               </TouchableOpacity>
             </View>
