@@ -11,6 +11,7 @@ import {
   Platform,
   LayoutAnimation,
   UIManager,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -207,10 +208,15 @@ export default function DashboardScreen() {
           }
         />
 
-        {/* 1. Minimalist Hero Countdown Card */}
+        {/* 1. Visual Hero Countdown Card */}
         <FadeInView delay={40}>
           <Card variant="elevated" style={styles.heroCard}>
             <View style={styles.heroTopRow}>
+              <Image
+                source={require('../../assets/images/onboarding-1.jpg')}
+                style={styles.heroCoupleImage}
+                resizeMode="cover"
+              />
               <View style={styles.countdownBlock}>
                 <Text style={styles.countdownNumber}>{daysRemaining}</Text>
                 <Text style={styles.countdownLabel}>Hari Menuju Hari H</Text>
@@ -581,9 +587,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  heroCoupleImage: {
+    width: 58,
+    height: 58,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginRight: 12,
+  },
   countdownBlock: {
-    flex: 1.2,
-    paddingRight: spacing.md,
+    flex: 1,
+    paddingRight: spacing.xs,
   },
   countdownNumber: {
     fontSize: 42,

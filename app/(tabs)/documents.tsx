@@ -192,50 +192,58 @@ export default function DocumentsScreen() {
           <Text style={styles.hintText}>Ketuk baris untuk status berkas • Tekan lama untuk edit / hapus</Text>
         </View>
 
-        <FadeInView delay={150}>
-          <Card style={styles.listCard}>
-            {filteredDocs.map((doc, idx) => (
-              <TouchableOpacity
-                key={doc.id}
-                activeOpacity={0.7}
-                onPress={() => toggleDocStatus(doc.id)}
-                onLongPress={() => openEditModal(doc)}
-                delayLongPress={300}
-                style={[styles.docRow, idx === filteredDocs.length - 1 && styles.rowLast]}
-              >
-                <View style={styles.docHeader}>
-                  <View style={styles.docTitleCol}>
-                    <Text style={styles.docTitle} numberOfLines={1}>
-                      {doc.title}
-                    </Text>
-                    <Text style={styles.docMeta}>
-                      {doc.documentType} •{' '}
-                      {doc.owner === 'groom' ? 'Octa' : doc.owner === 'bride' ? 'Jenesia' : 'Berdua'}
-                      {doc.issueDate ? ` • ${doc.issueDate}` : ''}
-                    </Text>
+        {/* Individual Document Cards */}
+        <View style={styles.cardStack}>
+          {filteredDocs.map((doc, idx) => (
+            <FadeInView key={doc.id} delay={Math.min(idx * 45, 220)}>
+              <Card style={styles.docCard}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => toggleDocStatus(doc.id)}
+                  onLongPress={() => openEditModal(doc)}
+                  delayLongPress={300}
+                >
+                  <View style={styles.docHeader}>
+                    <View style={styles.docIconCircle}>
+                      <Ionicons
+                        name={doc.category === 'church_canonical' ? 'ribbon-outline' : 'document-text-outline'}
+                        size={17}
+                        color={colors.accent}
+                      />
+                    </View>
+                    <View style={styles.docTitleCol}>
+                      <Text style={styles.docTitle} numberOfLines={1}>
+                        {doc.title}
+                      </Text>
+                      <Text style={styles.docMeta}>
+                        {doc.documentType} •{' '}
+                        {doc.owner === 'groom' ? 'Octa' : doc.owner === 'bride' ? 'Jenesia' : 'Berdua'}
+                        {doc.issueDate ? ` • ${doc.issueDate}` : ''}
+                      </Text>
+                    </View>
+                    <Badge
+                      label={
+                        doc.status === 'verified'
+                          ? 'Sah'
+                          : doc.status === 'expired'
+                          ? 'Kedaluwarsa'
+                          : 'Pending'
+                      }
+                      variant={
+                        doc.status === 'verified'
+                          ? 'success'
+                          : doc.status === 'expired'
+                          ? 'warning'
+                          : 'neutral'
+                      }
+                    />
                   </View>
-                  <Badge
-                    label={
-                      doc.status === 'verified'
-                        ? 'Sah'
-                        : doc.status === 'expired'
-                        ? 'Kedaluwarsa'
-                        : 'Pending'
-                    }
-                    variant={
-                      doc.status === 'verified'
-                        ? 'success'
-                        : doc.status === 'expired'
-                        ? 'warning'
-                        : 'neutral'
-                    }
-                  />
-                </View>
-                {doc.notes ? <Text style={styles.docNotes}>{doc.notes}</Text> : null}
-              </TouchableOpacity>
-            ))}
-          </Card>
-        </FadeInView>
+                  {doc.notes ? <Text style={styles.docNotes}>{doc.notes}</Text> : null}
+                </TouchableOpacity>
+              </Card>
+            </FadeInView>
+          ))}
+        </View>
       </ScrollView>
 
       {/* Document Modal */}
@@ -398,6 +406,21 @@ const styles = StyleSheet.create({
   listCard: {
     paddingVertical: 6,
     paddingHorizontal: 16,
+  },
+  cardStack: {
+    gap: 10,
+  },
+  docCard: {
+    padding: 15,
+    marginBottom: 0,
+  },
+  docIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.accentLight,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   docRow: {
     paddingVertical: 14,

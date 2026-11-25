@@ -271,123 +271,138 @@ export default function BudgetScreen() {
         </View>
 
         {activeTab === 0 ? (
-          <FadeInView delay={20}>
-            <Card style={styles.listCard}>
-              {categories.map((c, idx) => {
-                const isOver = c.committed > c.allocated;
-                const ratio = c.allocated > 0 ? Math.round((c.committed / c.allocated) * 100) : 0;
-                return (
+          <View style={styles.cardStack}>
+            {categories.map((c, idx) => {
+              const isOver = c.committed > c.allocated;
+              const ratio = c.allocated > 0 ? Math.round((c.committed / c.allocated) * 100) : 0;
+              return (
+                <FadeInView key={c.id} delay={Math.min(idx * 45, 220)}>
+                  <Card style={styles.itemCard}>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onLongPress={() => openEditCategory(c)}
+                      delayLongPress={300}
+                    >
+                      <View style={styles.rowBetween}>
+                        <View style={styles.titleWithIcon}>
+                          <View style={styles.iconCircle}>
+                            <Ionicons name="layers-outline" size={16} color={colors.accent} />
+                          </View>
+                          <Text style={styles.itemTitle} numberOfLines={1}>
+                            {c.name}
+                          </Text>
+                        </View>
+                        <Badge
+                          label={isOver ? `Over Rp ${((c.committed - c.allocated) / 1000000).toFixed(0)} Jt` : 'Aman'}
+                          variant={isOver ? 'warning' : 'success'}
+                        />
+                      </View>
+                      <ProgressBar
+                        progress={Math.min(100, ratio)}
+                        color={isOver ? colors.warning : colors.accent}
+                        height={6}
+                        style={{ marginVertical: 10 }}
+                      />
+                      <View style={styles.rowBetween}>
+                        <Text style={styles.subValue}>
+                          Komitmen: Rp {c.committed.toLocaleString('id-ID')}
+                        </Text>
+                        <Text style={styles.subLabel}>
+                          Alokasi: Rp {(c.allocated / 1000000).toFixed(0)} Jt
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  </Card>
+                </FadeInView>
+              );
+            })}
+          </View>
+        ) : activeTab === 1 ? (
+          <View style={styles.cardStack}>
+            {vendors.map((v, idx) => (
+              <FadeInView key={v.id} delay={Math.min(idx * 45, 220)}>
+                <Card style={styles.itemCard}>
                   <TouchableOpacity
-                    key={c.id}
                     activeOpacity={0.7}
-                    onLongPress={() => openEditCategory(c)}
+                    onLongPress={() => openEditVendor(v)}
                     delayLongPress={300}
-                    style={[styles.itemBlock, idx === categories.length - 1 && styles.itemLast]}
                   >
                     <View style={styles.rowBetween}>
-                      <Text style={styles.itemTitle} numberOfLines={1}>
-                        {c.name}
-                      </Text>
+                      <View style={styles.titleWithIcon}>
+                        <View style={styles.iconCircle}>
+                          <Ionicons name="storefront-outline" size={16} color={colors.accent} />
+                        </View>
+                        <View style={styles.flexInfo}>
+                          <Text style={styles.itemTitle} numberOfLines={1}>
+                            {v.name}
+                          </Text>
+                          <Text style={styles.subLabel}>
+                            {v.category} • {v.contactPerson}
+                          </Text>
+                        </View>
+                      </View>
                       <Badge
-                        label={isOver ? `Over Rp ${((c.committed - c.allocated) / 1000000).toFixed(0)} Jt` : 'Aman'}
-                        variant={isOver ? 'warning' : 'success'}
+                        label={v.status === 'booked' ? 'Booked' : v.status === 'completed' ? 'Selesai' : 'Shortlist'}
+                        variant={v.status === 'booked' ? 'success' : v.status === 'completed' ? 'neutral' : 'warning'}
                       />
                     </View>
-                    <ProgressBar
-                      progress={Math.min(100, ratio)}
-                      color={isOver ? colors.warning : colors.accent}
-                      height={6}
-                      style={{ marginVertical: 10 }}
-                    />
+                    <Text style={styles.contractAmount}>
+                      Rp {v.contractValue.toLocaleString('id-ID')}
+                    </Text>
+                  </TouchableOpacity>
+                </Card>
+              </FadeInView>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.cardStack}>
+            {transactions.map((tx, idx) => (
+              <FadeInView key={tx.id} delay={Math.min(idx * 45, 220)}>
+                <Card style={styles.itemCard}>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onLongPress={() => openEditTx(tx)}
+                    delayLongPress={300}
+                  >
                     <View style={styles.rowBetween}>
-                      <Text style={styles.subValue}>
-                        Komitmen: Rp {c.committed.toLocaleString('id-ID')}
+                      <View style={styles.titleWithIcon}>
+                        <View style={styles.iconCircle}>
+                          <Ionicons name="receipt-outline" size={16} color={colors.accent} />
+                        </View>
+                        <View style={styles.flexInfo}>
+                          <Text style={styles.itemTitle} numberOfLines={1}>
+                            {tx.notes}
+                          </Text>
+                          <Text style={styles.subLabel} numberOfLines={1}>
+                            {tx.vendorName} • {tx.date}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={styles.amountText}>
+                        Rp {tx.amount.toLocaleString('id-ID')}
                       </Text>
-                      <Text style={styles.subLabel}>
-                        Alokasi: Rp {(c.allocated / 1000000).toFixed(0)} Jt
-                      </Text>
+                    </View>
+                    <View style={styles.txBadgeRow}>
+                      <Badge
+                        label={
+                          tx.paidBy === 'groom'
+                            ? 'Octa'
+                            : tx.paidBy === 'bride'
+                            ? 'Jenesia'
+                            : 'Keluarga'
+                        }
+                        variant="accent"
+                      />
+                      <Badge
+                        label={tx.status === 'paid' ? 'Lunas' : 'Pending'}
+                        variant={tx.status === 'paid' ? 'success' : 'neutral'}
+                      />
                     </View>
                   </TouchableOpacity>
-                );
-              })}
-            </Card>
-          </FadeInView>
-        ) : activeTab === 1 ? (
-          <FadeInView delay={20}>
-            <Card style={styles.listCard}>
-              {vendors.map((v, idx) => (
-                <TouchableOpacity
-                  key={v.id}
-                  activeOpacity={0.7}
-                  onLongPress={() => openEditVendor(v)}
-                  delayLongPress={300}
-                  style={[styles.itemBlock, idx === vendors.length - 1 && styles.itemLast]}
-                >
-                  <View style={styles.rowBetween}>
-                    <View style={styles.flexInfo}>
-                      <Text style={styles.itemTitle} numberOfLines={1}>
-                        {v.name}
-                      </Text>
-                      <Text style={styles.subLabel}>
-                        {v.category} • {v.contactPerson}
-                      </Text>
-                    </View>
-                    <Badge
-                      label={v.status === 'booked' ? 'Booked' : v.status === 'completed' ? 'Selesai' : 'Shortlist'}
-                      variant={v.status === 'booked' ? 'success' : v.status === 'completed' ? 'neutral' : 'warning'}
-                    />
-                  </View>
-                  <Text style={styles.contractAmount}>
-                    Rp {v.contractValue.toLocaleString('id-ID')}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </Card>
-          </FadeInView>
-        ) : (
-          <FadeInView delay={20}>
-            <Card style={styles.listCard}>
-              {transactions.map((tx, idx) => (
-                <TouchableOpacity
-                  key={tx.id}
-                  activeOpacity={0.7}
-                  onLongPress={() => openEditTx(tx)}
-                  delayLongPress={300}
-                  style={[styles.itemBlock, idx === transactions.length - 1 && styles.itemLast]}
-                >
-                  <View style={styles.rowBetween}>
-                    <View style={styles.flexInfo}>
-                      <Text style={styles.itemTitle} numberOfLines={1}>
-                        {tx.notes}
-                      </Text>
-                      <Text style={styles.subLabel} numberOfLines={1}>
-                        {tx.vendorName} • {tx.date}
-                      </Text>
-                    </View>
-                    <Text style={styles.amountText}>
-                      Rp {tx.amount.toLocaleString('id-ID')}
-                    </Text>
-                  </View>
-                  <View style={styles.txBadgeRow}>
-                    <Badge
-                      label={
-                        tx.paidBy === 'groom'
-                          ? 'Octa'
-                          : tx.paidBy === 'bride'
-                          ? 'Jenesia'
-                          : 'Keluarga'
-                      }
-                      variant="accent"
-                    />
-                    <Badge
-                      label={tx.status === 'paid' ? 'Lunas' : 'Pending'}
-                      variant={tx.status === 'paid' ? 'success' : 'neutral'}
-                    />
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </Card>
-          </FadeInView>
+                </Card>
+              </FadeInView>
+            ))}
+          </View>
         )}
       </ScrollView>
 
@@ -581,6 +596,28 @@ const styles = StyleSheet.create({
   listCard: {
     paddingVertical: 6,
     paddingHorizontal: 16,
+  },
+  cardStack: {
+    gap: 10,
+  },
+  itemCard: {
+    padding: 15,
+    marginBottom: 0,
+  },
+  titleWithIcon: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingRight: 8,
+  },
+  iconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.accentLight,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   itemBlock: {
     paddingVertical: 14,

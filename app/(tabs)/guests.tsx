@@ -11,6 +11,7 @@ import {
   Platform,
   LayoutAnimation,
   UIManager,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -273,60 +274,78 @@ export default function GuestsScreen() {
               onChange={setSideIndex}
             />
 
-            <Card style={styles.listCard}>
+            {/* Individual Guest Cards */}
+            <View style={styles.cardStack}>
               {filteredGuests.map((g, idx) => (
-                <TouchableOpacity
-                  key={g.id}
-                  activeOpacity={0.7}
-                  onPress={() => cycleRsvp(g.id)}
-                  onLongPress={() => openEditGuest(g)}
-                  delayLongPress={300}
-                  style={[styles.rowItem, idx === filteredGuests.length - 1 && styles.rowLast]}
-                >
-                  <View style={styles.rowLeft}>
-                    <Text style={styles.itemTitle} numberOfLines={1}>
-                      {g.name}
-                    </Text>
-                    <Text style={styles.itemMeta}>
-                      {g.groupTag} • {g.estimatedPax} Pax •{' '}
-                      {g.side === 'groom' ? 'Octa' : g.side === 'bride' ? 'Jenesia' : 'Berdua'}
-                    </Text>
-                  </View>
-                  <Badge
-                    label={
-                      g.rsvpStatus === 'attending'
-                        ? 'Hadir'
-                        : g.rsvpStatus === 'tentative'
-                        ? 'Ragu'
-                        : g.rsvpStatus === 'declined'
-                        ? 'Menolak'
-                        : 'Pending'
-                    }
-                    variant={
-                      g.rsvpStatus === 'attending'
-                        ? 'success'
-                        : g.rsvpStatus === 'tentative'
-                        ? 'warning'
-                        : g.rsvpStatus === 'declined'
-                        ? 'danger'
-                        : 'neutral'
-                    }
-                  />
-                </TouchableOpacity>
+                <FadeInView key={g.id} delay={Math.min(idx * 45, 220)}>
+                  <Card style={styles.itemCard}>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => cycleRsvp(g.id)}
+                      onLongPress={() => openEditGuest(g)}
+                      delayLongPress={300}
+                      style={styles.cardRowInner}
+                    >
+                      <View style={styles.avatarCircle}>
+                        <Text style={styles.avatarInitial}>
+                          {g.name.trim().charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={styles.rowLeft}>
+                        <Text style={styles.itemTitle} numberOfLines={1}>
+                          {g.name}
+                        </Text>
+                        <Text style={styles.itemMeta}>
+                          {g.groupTag} • {g.estimatedPax} Pax •{' '}
+                          {g.side === 'groom' ? 'Octa' : g.side === 'bride' ? 'Jenesia' : 'Berdua'}
+                        </Text>
+                      </View>
+                      <Badge
+                        label={
+                          g.rsvpStatus === 'attending'
+                            ? 'Hadir'
+                            : g.rsvpStatus === 'tentative'
+                            ? 'Ragu'
+                            : g.rsvpStatus === 'declined'
+                            ? 'Menolak'
+                            : 'Pending'
+                        }
+                        variant={
+                          g.rsvpStatus === 'attending'
+                            ? 'success'
+                            : g.rsvpStatus === 'tentative'
+                            ? 'warning'
+                            : g.rsvpStatus === 'declined'
+                            ? 'danger'
+                            : 'neutral'
+                        }
+                      />
+                    </TouchableOpacity>
+                  </Card>
+                </FadeInView>
               ))}
-            </Card>
+            </View>
           </FadeInView>
         ) : (
           <FadeInView delay={20}>
-            {/* Hero Angpau Card */}
+            {/* Hero Angpau Card with Visual Illustration */}
             <Card variant="elevated" style={styles.heroCard}>
-              <Text style={styles.heroKicker}>TOTAL DANA ANGPAU TERKUMPUL</Text>
-              <Text style={styles.heroBigMoney}>
-                Rp {totalCashCollected.toLocaleString('id-ID')}
-              </Text>
-              <Text style={styles.heroSub}>
-                Terpisah dari kas pra-nikah • {gifts.length} total pemberian tercatat
-              </Text>
+              <View style={styles.heroVisualRow}>
+                <Image
+                  source={require('../../assets/images/onboarding-3.jpg')}
+                  style={styles.heroThumb}
+                  resizeMode="cover"
+                />
+                <View style={styles.heroTextCol}>
+                  <Text style={styles.heroKicker}>TOTAL DANA ANGPAU</Text>
+                  <Text style={styles.heroBigMoney}>
+                    Rp {totalCashCollected.toLocaleString('id-ID')}
+                  </Text>
+                  <Text style={styles.heroSub}>
+                    {gifts.length} total pemberian tercatat
+                  </Text>
+                </View>
+              </View>
             </Card>
 
             <View style={styles.statGrid}>
@@ -372,34 +391,44 @@ export default function GuestsScreen() {
               </View>
             </Card>
 
-            {/* Rincian Hadiah */}
-            <Card style={styles.listCard}>
+            {/* Rincian Hadiah (Individual Cards) */}
+            <View style={styles.cardStack}>
               {gifts.map((gf, idx) => (
-                <TouchableOpacity
-                  key={gf.id}
-                  activeOpacity={0.7}
-                  onPress={() => toggleThankYou(gf.id)}
-                  onLongPress={() => openEditGift(gf)}
-                  delayLongPress={300}
-                  style={[styles.rowItem, idx === gifts.length - 1 && styles.rowLast]}
-                >
-                  <View style={styles.rowLeft}>
-                    <Text style={styles.itemTitle} numberOfLines={1}>
-                      {gf.senderName}
-                    </Text>
-                    <Text style={styles.itemMeta} numberOfLines={1}>
-                      {gf.giftType === 'physical_gift'
-                        ? gf.giftDescription
-                        : `Rp ${gf.amount.toLocaleString('id-ID')} (${gf.giftType === 'cash' ? 'Tunai' : 'Transfer'})`}
-                    </Text>
-                  </View>
-                  <Badge
-                    label={gf.thankYouSent ? 'Ucapan Terkirim' : 'Kirim Ucapan'}
-                    variant={gf.thankYouSent ? 'success' : 'warning'}
-                  />
-                </TouchableOpacity>
+                <FadeInView key={gf.id} delay={Math.min(idx * 45, 220)}>
+                  <Card style={styles.itemCard}>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => toggleThankYou(gf.id)}
+                      onLongPress={() => openEditGift(gf)}
+                      delayLongPress={300}
+                      style={styles.cardRowInner}
+                    >
+                      <View style={styles.avatarCircle}>
+                        <Ionicons
+                          name={gf.giftType === 'physical_gift' ? 'gift-outline' : 'cash-outline'}
+                          size={17}
+                          color={colors.accent}
+                        />
+                      </View>
+                      <View style={styles.rowLeft}>
+                        <Text style={styles.itemTitle} numberOfLines={1}>
+                          {gf.senderName}
+                        </Text>
+                        <Text style={styles.itemMeta} numberOfLines={1}>
+                          {gf.giftType === 'physical_gift'
+                            ? gf.giftDescription
+                            : `Rp ${gf.amount.toLocaleString('id-ID')} (${gf.giftType === 'cash' ? 'Tunai' : 'Transfer'})`}
+                        </Text>
+                      </View>
+                      <Badge
+                        label={gf.thankYouSent ? 'Ucapan Terkirim' : 'Kirim Ucapan'}
+                        variant={gf.thankYouSent ? 'success' : 'warning'}
+                      />
+                    </TouchableOpacity>
+                  </Card>
+                </FadeInView>
               ))}
-            </Card>
+            </View>
           </FadeInView>
         )}
       </ScrollView>
@@ -652,6 +681,46 @@ const styles = StyleSheet.create({
   listCard: {
     paddingVertical: 6,
     paddingHorizontal: 16,
+  },
+  cardStack: {
+    gap: 10,
+  },
+  itemCard: {
+    padding: 14,
+    marginBottom: 0,
+  },
+  cardRowInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  avatarCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.accentLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.accent,
+  },
+  heroVisualRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  heroThumb: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  heroTextCol: {
+    flex: 1,
   },
   rowItem: {
     flexDirection: 'row',

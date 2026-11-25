@@ -11,6 +11,7 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +23,7 @@ import { Header } from '../../src/components/common/Header';
 import { Badge } from '../../src/components/common/Badge';
 import { ProgressBar } from '../../src/components/common/ProgressBar';
 import { FilterChipBar } from '../../src/components/common/FilterChipBar';
+import { FadeInView } from '../../src/components/common/FadeInView';
 import {
   useWeddingStore,
   ChecklistItem,
@@ -191,10 +193,28 @@ export default function ChecklistScreen() {
           }
         />
 
-        {/* Live Progress */}
-        <View style={styles.progressWrapper}>
-          <ProgressBar progress={progressRatio} height={6} />
-        </View>
+        {/* Visual Progress Hero Card */}
+        <FadeInView delay={20}>
+          <Card variant="elevated" style={styles.progressHeroCard}>
+            <View style={styles.progressHeroRow}>
+              <Image
+                source={require('../../assets/images/onboarding-1.jpg')}
+                style={styles.heroThumb}
+                resizeMode="cover"
+              />
+              <View style={styles.progressHeroInfo}>
+                <View style={styles.progressHeroTop}>
+                  <Text style={styles.progressHeroTitle}>Kesiapan Langkah</Text>
+                  <Text style={styles.progressHeroPercent}>{progressRatio}%</Text>
+                </View>
+                <ProgressBar progress={progressRatio} height={7} style={{ marginVertical: 8 }} />
+                <Text style={styles.progressHeroSub}>
+                  {completedCount} dari {tasks.length} langkah selesai
+                </Text>
+              </View>
+            </View>
+          </Card>
+        </FadeInView>
 
         {/* Minimalist Search Input */}
         <View style={styles.searchContainer}>
@@ -226,62 +246,67 @@ export default function ChecklistScreen() {
           onChange={setSelectedCategoryIndex}
         />
 
-        {/* Clean Single List Card */}
+        {/* Individual Task Cards */}
         {filteredTasks.length === 0 ? (
           <Card style={styles.emptyCard}>
             <Ionicons name="checkmark-done-outline" size={28} color={colors.textMuted} />
             <Text style={styles.emptyText}>Tidak ada tugas dalam kategori ini.</Text>
           </Card>
         ) : (
-          <Card style={styles.listCard}>
+          <View style={styles.cardStack}>
             {filteredTasks.map((t, index) => (
-              <TouchableOpacity
-                key={t.id}
-                activeOpacity={0.7}
-                onPress={() => toggleTask(t.id)}
-                onLongPress={() => openEditModal(t)}
-                delayLongPress={300}
-                style={[
-                  styles.taskRow,
-                  index === filteredTasks.length - 1 && styles.taskRowLast,
-                ]}
-              >
-                {/* Visual Checkbox */}
-                <View style={[styles.checkbox, t.completed && styles.checkboxChecked]}>
-                  {t.completed ? (
-                    <Ionicons name="checkmark" size={14} color={colors.textLight} />
-                  ) : null}
-                </View>
-
-                {/* Task Details */}
-                <View style={styles.taskBody}>
-                  <Text
-                    style={[styles.taskTitle, t.completed && styles.taskTitleCompleted]}
-                    numberOfLines={2}
+              <FadeInView key={t.id} delay={Math.min(index * 40, 220)}>
+                <Card
+                  style={[styles.taskCard, t.completed && styles.taskCardCompleted]}
+                >
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => toggleTask(t.id)}
+                    onLongPress={() => openEditModal(t)}
+                    delayLongPress={300}
+                    style={styles.taskCardInner}
                   >
-                    {t.title}
-                  </Text>
-                  <Text style={styles.taskMeta} numberOfLines={1}>
-                    {t.dueDate} • H{t.offsetDays} •{' '}
-                    {t.pic === 'groom' ? 'Octa' : t.pic === 'bride' ? 'Jenesia' : 'Berdua'}
-                  </Text>
-                </View>
+                    {/* Visual Checkbox */}
+                    <View style={[styles.checkbox, t.completed && styles.checkboxChecked]}>
+                      {t.completed ? (
+                        <Ionicons name="checkmark" size={14} color={colors.textLight} />
+                      ) : null}
+                    </View>
 
-                {/* Priority Badge */}
-                <View style={styles.taskBadgeCol}>
-                  {t.priority === 'critical' ? (
-                    <Badge label="Kritis" variant="danger" />
-                  ) : t.priority === 'high' ? (
-                    <Badge label="Penting" variant="warning" />
-                  ) : t.priority === 'medium' ? (
-                    <Badge label="Normal" variant="neutral" />
-                  ) : (
-                    <Badge label="Rendah" variant="info" />
-                  )}
-                </View>
-              </TouchableOpacity>
+                    {/* Task Details */}
+                    <View style={styles.taskBody}>
+                      <Text
+                        style={[styles.taskTitle, t.completed && styles.taskTitleCompleted]}
+                        numberOfLines={2}
+                      >
+                        {t.title}
+                      </Text>
+                      <View style={styles.taskMetaRow}>
+                        <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
+                        <Text style={styles.taskMeta} numberOfLines={1}>
+                          {t.dueDate} • H{t.offsetDays} •{' '}
+                          {t.pic === 'groom' ? 'Octa' : t.pic === 'bride' ? 'Jenesia' : 'Berdua'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Priority Badge */}
+                    <View style={styles.taskBadgeCol}>
+                      {t.priority === 'critical' ? (
+                        <Badge label="Kritis" variant="danger" />
+                      ) : t.priority === 'high' ? (
+                        <Badge label="Penting" variant="warning" />
+                      ) : t.priority === 'medium' ? (
+                        <Badge label="Normal" variant="neutral" />
+                      ) : (
+                        <Badge label="Rendah" variant="info" />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                </Card>
+              </FadeInView>
             ))}
-          </Card>
+          </View>
         )}
       </ScrollView>
 
@@ -476,8 +501,64 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  progressWrapper: {
+  progressHeroCard: {
+    padding: 14,
     marginBottom: spacing.md,
+  },
+  progressHeroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  heroThumb: {
+    width: 58,
+    height: 58,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  progressHeroInfo: {
+    flex: 1,
+  },
+  progressHeroTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  progressHeroTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  progressHeroPercent: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.accent,
+  },
+  progressHeroSub: {
+    fontSize: 11,
+    color: colors.textSecondary,
+  },
+  cardStack: {
+    gap: 10,
+  },
+  taskCard: {
+    paddingVertical: 14,
+    paddingHorizontal: 15,
+    marginBottom: 0,
+  },
+  taskCardCompleted: {
+    opacity: 0.72,
+  },
+  taskCardInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  taskMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
   },
   searchContainer: {
     flexDirection: 'row',
