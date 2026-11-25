@@ -12,9 +12,15 @@ function generateUuid(): string {
   });
 }
 
-export type TaskCategory = 'canonical' | 'civil' | 'liturgy' | 'vendor';
+export type TaskCategory = string;
 export type TaskPriority = 'critical' | 'high' | 'medium' | 'low';
 export type TaskPic = 'groom' | 'bride' | 'both';
+
+export interface TaskCategoryItem {
+  id: string;
+  key: string;
+  label: string;
+}
 
 export interface ChecklistItem {
   id: string;
@@ -98,6 +104,13 @@ const DEFAULT_PROFILE: WeddingProfile = {
   weddingDate: '2027-10-10T00:00:00.000Z',
   parishName: 'Paroki St. Perawan Maria',
 };
+
+const initialTaskCategories: TaskCategoryItem[] = [
+  { id: 'cat-canonical', key: 'canonical', label: 'Kanonik & KPP' },
+  { id: 'cat-civil', key: 'civil', label: 'Sipil' },
+  { id: 'cat-liturgy', key: 'liturgy', label: 'Liturgi' },
+  { id: 'cat-vendor', key: 'vendor', label: 'Vendor' },
+];
 
 const initialTasks: ChecklistItem[] = [
   { id: '1', title: 'Kursus Persiapan Perkawinan (KPP)', category: 'canonical', dueDate: '13 Apr 2027', offsetDays: -180, priority: 'critical', pic: 'both', completed: true },
@@ -205,6 +218,7 @@ export interface WeddingState {
   hasSeenOnboarding: boolean;
   setHasSeenOnboarding: (seen: boolean) => void;
   profile: WeddingProfile;
+  taskCategories: TaskCategoryItem[];
   tasks: ChecklistItem[];
   categories: CategoryItem[];
   vendors: VendorItem[];
@@ -215,6 +229,11 @@ export interface WeddingState {
 
   // Profile actions
   updateProfile: (patch: Partial<WeddingProfile>) => void;
+
+  // Task Category actions
+  addTaskCategory: (label: string) => TaskCategoryItem;
+  updateTaskCategory: (id: string, label: string) => void;
+  deleteTaskCategory: (id: string) => void;
 
   // Task actions
   toggleTask: (id: string) => void;
@@ -269,6 +288,7 @@ export const useWeddingStore = create<WeddingState>()(
       hasSeenOnboarding: false,
       setHasSeenOnboarding: (seen) => set({ hasSeenOnboarding: seen }),
       profile: DEFAULT_PROFILE,
+      taskCategories: initialTaskCategories,
       tasks: initialTasks,
       categories: initialCategories,
       vendors: initialVendors,
@@ -294,6 +314,35 @@ export const useWeddingStore = create<WeddingState>()(
             CloudSyncService.updateWorkspaceWeddingDate(patch.weddingDate).catch(() => {});
           }
           return { profile: nextProfile, tasks: nextTasks };
+        }),
+
+      // Task Categories
+      addTaskCategory: (label) => {
+        const trimmed = label.trim();
+        const key = `${trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_${Date.now().toString().slice(-4)}`;
+        const created: TaskCategoryItem = { id: generateUuid(), key, label: trimmed };
+        set((state) => ({
+          taskCategories: [...state.taskCategories, created],
+        }));
+        return created;
+      },
+      updateTaskCategory: (id, label) =>
+        set((state) => ({
+          taskCategories: state.taskCategories.map((c) =>
+            c.id === id ? { ...c, label: label.trim() || c.label } : c
+          ),
+        })),
+      deleteTaskCategory: (id) =>
+        set((state) => {
+          const target = state.taskCategories.find((c) => c.id === id);
+          const remaining = state.taskCategories.filter((c) => c.id !== id);
+          const fallbackKey = remaining[0]?.key || 'canonical';
+          return {
+            taskCategories: remaining,
+            tasks: target
+              ? state.tasks.map((t) => (t.category === target.key ? { ...t, category: fallbackKey } : t))
+              : state.tasks,
+          };
         }),
 
       // Tasks
@@ -501,6 +550,7 @@ export const useWeddingStore = create<WeddingState>()(
       resetAllData: () =>
         set({
           profile: DEFAULT_PROFILE,
+          taskCategories: initialTaskCategories,
           tasks: initialTasks,
           categories: initialCategories,
           vendors: initialVendors,

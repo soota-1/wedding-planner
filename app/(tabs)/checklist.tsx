@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { subDays, format } from 'date-fns';
+import { subDays, format, differenceInCalendarDays } from 'date-fns';
 import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 import { Card } from '../../src/components/common/Card';
@@ -24,10 +24,11 @@ import { Badge } from '../../src/components/common/Badge';
 import { ProgressBar } from '../../src/components/common/ProgressBar';
 import { FilterChipBar } from '../../src/components/common/FilterChipBar';
 import { FadeInView } from '../../src/components/common/FadeInView';
+import { CalendarPicker } from '../../src/components/common/CalendarPicker';
 import {
   useWeddingStore,
   ChecklistItem,
-  TaskCategory,
+  TaskCategoryItem,
   TaskPriority,
   TaskPic,
 } from '../../src/stores/useWeddingStore';
@@ -36,21 +37,11 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const categoryLabels = ['Semua', 'Kanonik & KPP', 'Sipil', 'Liturgi', 'Vendor'];
-const categoryKeys = ['all', 'canonical', 'civil', 'liturgy', 'vendor'];
-
 const priorityOptions: { key: TaskPriority; label: string }[] = [
   { key: 'critical', label: 'Kritis' },
   { key: 'high', label: 'Penting' },
   { key: 'medium', label: 'Normal' },
   { key: 'low', label: 'Rendah' },
-];
-
-const formCategoryOptions: { key: TaskCategory; label: string }[] = [
-  { key: 'canonical', label: 'Kanonik' },
-  { key: 'civil', label: 'Sipil' },
-  { key: 'liturgy', label: 'Liturgi' },
-  { key: 'vendor', label: 'Vendor' },
 ];
 
 const picOptions: { key: TaskPic; label: string }[] = [
@@ -59,64 +50,109 @@ const picOptions: { key: TaskPic; label: string }[] = [
   { key: 'bride', label: 'Jenesia' },
 ];
 
-const datePresets = [
-  { label: 'H-180', offset: -180 },
-  { label: 'H-90', offset: -90 },
-  { label: 'H-30', offset: -30 },
-  { label: 'H-7', offset: -7 },
-];
+function formatOffsetLabel(offsetDays: number): string {
+  if (offsetDays === 0) return 'Hari H';
+  return offsetDays < 0 ? `H${offsetDays}` : `H+${offsetDays}`;
+}
 
 export default function ChecklistScreen() {
   const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
 
   const weddingDateIso = useWeddingStore((s) => s.profile.weddingDate);
+  const taskCategories = useWeddingStore((s) => s.taskCategories);
   const tasks = useWeddingStore((s) => s.tasks);
+
+  const addTaskCategory = useWeddingStore((s) => s.addTaskCategory);
+  const updateTaskCategory = useWeddingStore((s) => s.updateTaskCategory);
+  const deleteTaskCategory = useWeddingStore((s) => s.deleteTaskCategory);
+
   const toggleTaskStore = useWeddingStore((s) => s.toggleTask);
   const addTaskStore = useWeddingStore((s) => s.addTask);
   const updateTaskStore = useWeddingStore((s) => s.updateTask);
   const deleteTaskStore = useWeddingStore((s) => s.deleteTask);
 
-  // Modal Form State (supports both Add and Edit)
+  const parsedWedding = new Date(weddingDateIso);
+  const safeWeddingDate = isNaN(parsedWedding.getTime())
+    ? new Date('2027-10-10T00:00:00.000Z')
+    : parsedWedding;
+
+  // Task Modal Form State
   const [modalVisible, setModalVisible] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [formCategory, setFormCategory] = useState<string>(taskCategories[0]?.key || 'canonical');
   const [formTitle, setFormTitle] = useState('');
-  const [formCategory, setFormCategory] = useState<TaskCategory>('canonical');
   const [formPriority, setFormPriority] = useState<TaskPriority>('medium');
   const [formPic, setFormPic] = useState<TaskPic>('both');
-  const [formDueDate, setFormDueDate] = useState('10 Sep 2027');
+  const [formSelectedDate, setFormSelectedDate] = useState<Date>(subDays(safeWeddingDate, 30));
+  const [formDueDate, setFormDueDate] = useState(format(subDays(safeWeddingDate, 30), 'dd MMM yyyy'));
   const [formOffsetDays, setFormOffsetDays] = useState(-30);
+  const [showCalendar, setShowCalendar] = useState(false);
+
+  // Quick inline category add inside task modal
+  const [inlineNewCat, setInlineNewCat] = useState('');
+  const [showInlineCatInput, setShowInlineCatInput] = useState(false);
+
+  // Category Management Modal State
+  const [catModalVisible, setCatModalVisible] = useState(false);
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [catInputName, setCatInputName] = useState('');
+
+  const categoryLabels = ['Semua', ...taskCategories.map((c) => c.label)];
+  const categoryKeys = ['all', ...taskCategories.map((c) => c.key)];
 
   const openAddModal = () => {
+    const activeCatKey = categoryKeys[selectedCategoryIndex];
+    const defaultCat =
+      activeCatKey && activeCatKey !== 'all'
+        ? activeCatKey
+        : taskCategories[0]?.key || 'canonical';
+    const defaultDate = subDays(safeWeddingDate, 30);
+
     setEditingTaskId(null);
+    setFormCategory(defaultCat);
     setFormTitle('');
-    setFormCategory('canonical');
     setFormPriority('medium');
     setFormPic('both');
-    const baseDate = new Date(weddingDateIso);
-    const defaultDate = !isNaN(baseDate.getTime()) ? format(subDays(baseDate, 30), 'dd MMM yyyy') : '10 Sep 2027';
-    setFormDueDate(defaultDate);
-    setFormOffsetDays(-30);
+    setFormSelectedDate(defaultDate);
+    setFormDueDate(format(defaultDate, 'dd MMM yyyy'));
+    setFormOffsetDays(differenceInCalendarDays(defaultDate, safeWeddingDate));
+    setShowCalendar(false);
+    setShowInlineCatInput(false);
+    setInlineNewCat('');
     setModalVisible(true);
   };
 
   const openEditModal = (item: ChecklistItem) => {
+    const derivedDate = subDays(safeWeddingDate, Math.abs(item.offsetDays));
     setEditingTaskId(item.id);
-    setFormTitle(item.title);
     setFormCategory(item.category);
+    setFormTitle(item.title);
     setFormPriority(item.priority);
     setFormPic(item.pic);
+    setFormSelectedDate(derivedDate);
     setFormDueDate(item.dueDate);
     setFormOffsetDays(item.offsetDays);
+    setShowCalendar(false);
+    setShowInlineCatInput(false);
+    setInlineNewCat('');
     setModalVisible(true);
   };
 
-  const applyDatePreset = (offset: number) => {
-    const baseDate = new Date(weddingDateIso);
-    const safeDate = !isNaN(baseDate.getTime()) ? baseDate : new Date('2027-10-10T00:00:00.000Z');
-    const targetDate = subDays(safeDate, Math.abs(offset));
-    setFormOffsetDays(offset);
-    setFormDueDate(format(targetDate, 'dd MMM yyyy'));
+  const handleDatePicked = (date: Date, offsetDays: number, formattedLabel: string) => {
+    setFormSelectedDate(date);
+    setFormOffsetDays(offsetDays);
+    setFormDueDate(formattedLabel);
+  };
+
+  const handleInlineAddCategory = () => {
+    const trimmed = inlineNewCat.trim();
+    if (!trimmed) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const created = addTaskCategory(trimmed);
+    setFormCategory(created.key);
+    setInlineNewCat('');
+    setShowInlineCatInput(false);
   };
 
   const toggleTask = (id: string) => {
@@ -135,14 +171,14 @@ export default function ChecklistScreen() {
         category: formCategory,
         priority: formPriority,
         pic: formPic,
-        dueDate: formDueDate.trim() || 'Segera',
+        dueDate: formDueDate,
         offsetDays: formOffsetDays,
       });
     } else {
       addTaskStore({
         title: trimmed,
         category: formCategory,
-        dueDate: formDueDate.trim() || 'Segera',
+        dueDate: formDueDate,
         offsetDays: formOffsetDays,
         priority: formPriority,
         pic: formPic,
@@ -160,7 +196,45 @@ export default function ChecklistScreen() {
     setModalVisible(false);
   };
 
-  const activeCategoryKey = categoryKeys[selectedCategoryIndex];
+  // Category CRUD Handlers
+  const openCategoryManager = () => {
+    setEditingCatId(null);
+    setCatInputName('');
+    setCatModalVisible(true);
+  };
+
+  const handleSaveCategory = () => {
+    const trimmed = catInputName.trim();
+    if (!trimmed) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (editingCatId) {
+      updateTaskCategory(editingCatId, trimmed);
+      setEditingCatId(null);
+    } else {
+      addTaskCategory(trimmed);
+    }
+    setCatInputName('');
+  };
+
+  const startEditCategory = (cat: TaskCategoryItem) => {
+    setEditingCatId(cat.id);
+    setCatInputName(cat.label);
+  };
+
+  const handleDeleteCategory = (id: string) => {
+    if (taskCategories.length <= 1) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    deleteTaskCategory(id);
+    setSelectedCategoryIndex(0);
+    if (editingCatId === id) {
+      setEditingCatId(null);
+      setCatInputName('');
+    }
+  };
+
+  const safeCategoryIndex =
+    selectedCategoryIndex < categoryKeys.length ? selectedCategoryIndex : 0;
+  const activeCategoryKey = categoryKeys[safeCategoryIndex];
   const filteredTasks = tasks.filter((t) => {
     const matchesCategory = activeCategoryKey === 'all' || t.category === activeCategoryKey;
     const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase());
@@ -233,16 +307,26 @@ export default function ChecklistScreen() {
           ) : null}
         </View>
 
-        {/* Helper Cue */}
-        <View style={styles.hintContainer}>
-          <Ionicons name="information-circle-outline" size={13} color={colors.textMuted} />
-          <Text style={styles.hintText}>Ketuk baris untuk centang • Tekan lama untuk edit / hapus</Text>
+        {/* Helper Cue + Kelola Kategori */}
+        <View style={styles.hintRowBetween}>
+          <View style={styles.hintLeft}>
+            <Ionicons name="information-circle-outline" size={13} color={colors.textMuted} />
+            <Text style={styles.hintText}>Ketuk centang • Tekan lama edit/hapus</Text>
+          </View>
+          <TouchableOpacity
+            onPress={openCategoryManager}
+            activeOpacity={0.75}
+            style={styles.manageCatBtn}
+          >
+            <Ionicons name="folder-outline" size={13} color={colors.accent} />
+            <Text style={styles.manageCatText}>Kelola Kategori</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Scrollable Category Pills */}
+        {/* Scrollable Dynamic Category Pills */}
         <FilterChipBar
           options={categoryLabels}
-          selectedIndex={selectedCategoryIndex}
+          selectedIndex={safeCategoryIndex}
           onChange={setSelectedCategoryIndex}
         />
 
@@ -254,58 +338,57 @@ export default function ChecklistScreen() {
           </Card>
         ) : (
           <View style={styles.cardStack}>
-            {filteredTasks.map((t, index) => (
-              <FadeInView key={t.id} delay={Math.min(index * 40, 220)}>
-                <Card
-                  style={[styles.taskCard, t.completed && styles.taskCardCompleted]}
-                >
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={() => toggleTask(t.id)}
-                    onLongPress={() => openEditModal(t)}
-                    delayLongPress={300}
-                    style={styles.taskCardInner}
-                  >
-                    {/* Visual Checkbox */}
-                    <View style={[styles.checkbox, t.completed && styles.checkboxChecked]}>
-                      {t.completed ? (
-                        <Ionicons name="checkmark" size={14} color={colors.textLight} />
-                      ) : null}
-                    </View>
-
-                    {/* Task Details */}
-                    <View style={styles.taskBody}>
-                      <Text
-                        style={[styles.taskTitle, t.completed && styles.taskTitleCompleted]}
-                        numberOfLines={2}
-                      >
-                        {t.title}
-                      </Text>
-                      <View style={styles.taskMetaRow}>
-                        <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
-                        <Text style={styles.taskMeta} numberOfLines={1}>
-                          {t.dueDate} • H{t.offsetDays} •{' '}
-                          {t.pic === 'groom' ? 'Octa' : t.pic === 'bride' ? 'Jenesia' : 'Berdua'}
-                        </Text>
+            {filteredTasks.map((t, index) => {
+              const catLabel =
+                taskCategories.find((c) => c.key === t.category)?.label || t.category;
+              return (
+                <FadeInView key={t.id} delay={Math.min(index * 40, 220)}>
+                  <Card style={[styles.taskCard, t.completed && styles.taskCardCompleted]}>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => toggleTask(t.id)}
+                      onLongPress={() => openEditModal(t)}
+                      delayLongPress={300}
+                      style={styles.taskCardInner}
+                    >
+                      <View style={[styles.checkbox, t.completed && styles.checkboxChecked]}>
+                        {t.completed ? (
+                          <Ionicons name="checkmark" size={14} color={colors.textLight} />
+                        ) : null}
                       </View>
-                    </View>
 
-                    {/* Priority Badge */}
-                    <View style={styles.taskBadgeCol}>
-                      {t.priority === 'critical' ? (
-                        <Badge label="Kritis" variant="danger" />
-                      ) : t.priority === 'high' ? (
-                        <Badge label="Penting" variant="warning" />
-                      ) : t.priority === 'medium' ? (
-                        <Badge label="Normal" variant="neutral" />
-                      ) : (
-                        <Badge label="Rendah" variant="info" />
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                </Card>
-              </FadeInView>
-            ))}
+                      <View style={styles.taskBody}>
+                        <Text
+                          style={[styles.taskTitle, t.completed && styles.taskTitleCompleted]}
+                          numberOfLines={2}
+                        >
+                          {t.title}
+                        </Text>
+                        <View style={styles.taskMetaRow}>
+                          <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
+                          <Text style={styles.taskMeta} numberOfLines={1}>
+                            {t.dueDate} ({formatOffsetLabel(t.offsetDays)}) • {catLabel} •{' '}
+                            {t.pic === 'groom' ? 'Octa' : t.pic === 'bride' ? 'Jenesia' : 'Berdua'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.taskBadgeCol}>
+                        {t.priority === 'critical' ? (
+                          <Badge label="Kritis" variant="danger" />
+                        ) : t.priority === 'high' ? (
+                          <Badge label="Penting" variant="warning" />
+                        ) : t.priority === 'medium' ? (
+                          <Badge label="Normal" variant="neutral" />
+                        ) : (
+                          <Badge label="Rendah" variant="info" />
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  </Card>
+                </FadeInView>
+              );
+            })}
           </View>
         )}
       </ScrollView>
@@ -339,8 +422,57 @@ export default function ChecklistScreen() {
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              {/* Input Judul */}
-              <Text style={styles.fieldLabel}>Nama Tugas</Text>
+              {/* STEP 1: Pilih Kategori Terlebih Dahulu */}
+              <View style={styles.labelRowBetween}>
+                <Text style={styles.fieldLabel}>1. Pilih Kategori Tugas</Text>
+                <TouchableOpacity
+                  onPress={() => setShowInlineCatInput((v) => !v)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.inlineAddLink}>
+                    {showInlineCatInput ? 'Tutup' : '+ Kategori Baru'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {showInlineCatInput ? (
+                <View style={styles.inlineCatRow}>
+                  <TextInput
+                    placeholder="Nama kategori baru..."
+                    placeholderTextColor={colors.textMuted}
+                    value={inlineNewCat}
+                    onChangeText={setInlineNewCat}
+                    style={[styles.modalInput, { flex: 1, marginBottom: 0 }]}
+                  />
+                  <TouchableOpacity
+                    onPress={handleInlineAddCategory}
+                    style={styles.inlineCatSaveBtn}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.inlineCatSaveText}>Tambah</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
+              <View style={styles.pillRow}>
+                {taskCategories.map((cat) => {
+                  const active = formCategory === cat.key;
+                  return (
+                    <TouchableOpacity
+                      key={cat.id}
+                      onPress={() => setFormCategory(cat.key)}
+                      style={[styles.selectPill, active && styles.selectPillActive]}
+                    >
+                      <Text style={[styles.selectPillText, active && styles.selectPillTextActive]}>
+                        {cat.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* STEP 2: Input Judul */}
+              <Text style={styles.fieldLabel}>2. Nama Tugas</Text>
               <TextInput
                 placeholder="Misal: Fitting jas pengantin Octa"
                 placeholderTextColor={colors.textMuted}
@@ -350,8 +482,40 @@ export default function ChecklistScreen() {
                 autoFocus={!editingTaskId}
               />
 
-              {/* Prioritas Dropdown / Selector Chips */}
-              <Text style={styles.fieldLabel}>Tingkat Prioritas</Text>
+              {/* STEP 3: Tanggal Jatuh Tempo (Calendar Picker, auto H-) */}
+              <Text style={styles.fieldLabel}>3. Tanggal Jatuh Tempo (Otomatis Hitung H-)</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                  setShowCalendar((v) => !v);
+                }}
+                activeOpacity={0.75}
+                style={styles.datePickerTrigger}
+              >
+                <View style={styles.dateTriggerLeft}>
+                  <Ionicons name="calendar-outline" size={18} color={colors.accent} />
+                  <Text style={styles.dateTriggerText}>{formDueDate}</Text>
+                </View>
+                <View style={styles.dateTriggerRight}>
+                  <Badge label={formatOffsetLabel(formOffsetDays)} variant="accent" />
+                  <Ionicons
+                    name={showCalendar ? 'chevron-up' : 'chevron-down'}
+                    size={16}
+                    color={colors.textMuted}
+                  />
+                </View>
+              </TouchableOpacity>
+
+              {showCalendar ? (
+                <CalendarPicker
+                  selectedDate={formSelectedDate}
+                  weddingDate={safeWeddingDate}
+                  onSelectDate={handleDatePicked}
+                />
+              ) : null}
+
+              {/* STEP 4: Prioritas */}
+              <Text style={styles.fieldLabel}>4. Tingkat Prioritas</Text>
               <View style={styles.pillRow}>
                 {priorityOptions.map((opt) => {
                   const active = formPriority === opt.key;
@@ -362,8 +526,16 @@ export default function ChecklistScreen() {
                       style={[
                         styles.selectPill,
                         active && styles.selectPillActive,
-                        active && opt.key === 'critical' && { backgroundColor: colors.danger, borderColor: colors.danger },
-                        active && opt.key === 'high' && { backgroundColor: colors.warning, borderColor: colors.warning },
+                        active &&
+                          opt.key === 'critical' && {
+                            backgroundColor: colors.danger,
+                            borderColor: colors.danger,
+                          },
+                        active &&
+                          opt.key === 'high' && {
+                            backgroundColor: colors.warning,
+                            borderColor: colors.warning,
+                          },
                       ]}
                     >
                       <Text style={[styles.selectPillText, active && styles.selectPillTextActive]}>
@@ -374,58 +546,8 @@ export default function ChecklistScreen() {
                 })}
               </View>
 
-              {/* Tanggal Jatuh Tempo + Quick Presets */}
-              <Text style={styles.fieldLabel}>Tanggal Jatuh Tempo</Text>
-              <TextInput
-                placeholder="Misal: 15 Mei 2027"
-                placeholderTextColor={colors.textMuted}
-                value={formDueDate}
-                onChangeText={setFormDueDate}
-                style={styles.modalInput}
-              />
-              <View style={[styles.pillRow, { marginTop: -8, marginBottom: 14 }]}>
-                {datePresets.map((p) => (
-                  <TouchableOpacity
-                    key={p.label}
-                    onPress={() => applyDatePreset(p.offset)}
-                    style={[
-                      styles.presetChip,
-                      formOffsetDays === p.offset && styles.presetChipActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.presetChipText,
-                        formOffsetDays === p.offset && styles.presetChipTextActive,
-                      ]}
-                    >
-                      {p.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Kategori */}
-              <Text style={styles.fieldLabel}>Kategori</Text>
-              <View style={styles.pillRow}>
-                {formCategoryOptions.map((opt) => {
-                  const active = formCategory === opt.key;
-                  return (
-                    <TouchableOpacity
-                      key={opt.key}
-                      onPress={() => setFormCategory(opt.key)}
-                      style={[styles.selectPill, active && styles.selectPillActive]}
-                    >
-                      <Text style={[styles.selectPillText, active && styles.selectPillTextActive]}>
-                        {opt.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Penanggung Jawab (PIC) */}
-              <Text style={styles.fieldLabel}>Penanggung Jawab (PIC)</Text>
+              {/* STEP 5: Penanggung Jawab (PIC) */}
+              <Text style={styles.fieldLabel}>5. Penanggung Jawab (PIC)</Text>
               <View style={styles.pillRow}>
                 {picOptions.map((opt) => {
                   const active = formPic === opt.key;
@@ -470,6 +592,74 @@ export default function ChecklistScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Modal Kelola Kategori (Add, Edit, Delete Categories) */}
+      <Modal
+        visible={catModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCatModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Kelola Kategori Checklist</Text>
+              <TouchableOpacity
+                onPress={() => setCatModalVisible(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.inlineCatRow}>
+              <TextInput
+                placeholder={editingCatId ? 'Ubah nama kategori...' : 'Tambah kategori baru...'}
+                placeholderTextColor={colors.textMuted}
+                value={catInputName}
+                onChangeText={setCatInputName}
+                style={[styles.modalInput, { flex: 1, marginBottom: 0 }]}
+              />
+              <TouchableOpacity
+                onPress={handleSaveCategory}
+                style={styles.inlineCatSaveBtn}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.inlineCatSaveText}>
+                  {editingCatId ? 'Simpan' : 'Tambah'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 280, marginTop: 12 }}>
+              {taskCategories.map((cat) => (
+                <View key={cat.id} style={styles.catManageRow}>
+                  <Text style={styles.catManageLabel}>{cat.label}</Text>
+                  <View style={styles.catManageActions}>
+                    <TouchableOpacity
+                      onPress={() => startEditCategory(cat)}
+                      style={styles.catIconBtn}
+                    >
+                      <Ionicons name="create-outline" size={17} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                    {taskCategories.length > 1 ? (
+                      <TouchableOpacity
+                        onPress={() => handleDeleteCategory(cat.id)}
+                        style={styles.catIconBtn}
+                      >
+                        <Ionicons name="trash-outline" size={17} color={colors.danger} />
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -491,15 +681,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.accent,
-    paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: spacing.borderRadiusPill,
+    paddingHorizontal: 12,
+    borderRadius: 999,
     gap: 4,
   },
   addButtonText: {
-    color: colors.textLight,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
+    color: colors.textLight,
   },
   progressHeroCard: {
     padding: 14,
@@ -539,6 +729,54 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textSecondary,
   },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.cardBg,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginBottom: spacing.xs,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    fontSize: 13,
+    color: colors.textPrimary,
+  },
+  hintRowBetween: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    paddingHorizontal: 2,
+  },
+  hintLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flex: 1,
+  },
+  hintText: {
+    fontSize: 11,
+    color: colors.textMuted,
+  },
+  manageCatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: colors.accentLight,
+  },
+  manageCatText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.accent,
+  },
   cardStack: {
     gap: 10,
   },
@@ -554,54 +792,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  taskMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.cardBg,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    marginBottom: spacing.xs,
-    gap: 8,
-  },
-  hintContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: spacing.sm,
-    paddingHorizontal: 2,
-  },
-  hintText: {
-    fontSize: 11,
-    color: colors.textMuted,
-  },
-  searchInput: {
-    flex: 1,
-    height: 40,
-    fontSize: 13,
-    color: colors.textPrimary,
-  },
-  listCard: {
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-  },
-  taskRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 13,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  taskRowLast: {
-    borderBottomWidth: 0,
-  },
   checkbox: {
     width: 22,
     height: 22,
@@ -615,11 +805,6 @@ const styles = StyleSheet.create({
   checkboxChecked: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,
-  },
-  taskInteractiveBody: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   taskBody: {
     flex: 1,
@@ -635,24 +820,28 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
     color: colors.textMuted,
   },
-  taskMeta: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  taskBadgeCol: {
+  taskMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
+    marginTop: 4,
+  },
+  taskMeta: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  taskBadgeCol: {
+    alignItems: 'flex-end',
   },
   emptyCard: {
-    padding: spacing.xl,
     alignItems: 'center',
+    paddingVertical: 32,
     gap: 8,
   },
   emptyText: {
     fontSize: 13,
-    color: colors.textSecondary,
+    color: colors.textMuted,
   },
   modalOverlay: {
     flex: 1,
@@ -661,22 +850,29 @@ const styles = StyleSheet.create({
   },
   modalSheet: {
     backgroundColor: colors.cardBg,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    padding: spacing.lg,
-    paddingBottom: Platform.OS === 'ios' ? 32 : 24,
-    maxHeight: '85%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: Platform.OS === 'ios' ? 34 : spacing.lg,
+    maxHeight: '88%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: 14,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
+  },
+  labelRowBetween: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
   },
   fieldLabel: {
     fontSize: 12,
@@ -684,34 +880,85 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: 6,
   },
+  inlineAddLink: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.accent,
+  },
+  inlineCatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  inlineCatSaveBtn: {
+    backgroundColor: colors.accent,
+    paddingHorizontal: 14,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inlineCatSaveText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textLight,
+  },
   modalInput: {
-    borderWidth: 1,
-    borderColor: colors.borderDark,
     backgroundColor: colors.bg,
+    borderColor: colors.border,
+    borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 11,
+    height: 44,
     fontSize: 14,
     color: colors.textPrimary,
     marginBottom: 14,
+  },
+  datePickerTrigger: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.bg,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 46,
+    marginBottom: 14,
+  },
+  dateTriggerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  dateTriggerText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  dateTriggerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   pillRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   selectPill: {
-    paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: spacing.borderRadiusPill,
+    paddingHorizontal: 14,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.borderDark,
-    backgroundColor: colors.cardBg,
+    borderColor: colors.border,
+    backgroundColor: colors.bg,
   },
   selectPillActive: {
-    backgroundColor: colors.textPrimary,
-    borderColor: colors.textPrimary,
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   selectPillText: {
     fontSize: 12,
@@ -721,55 +968,58 @@ const styles = StyleSheet.create({
   selectPillTextActive: {
     color: colors.textLight,
   },
-  presetChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: colors.surfaceMuted,
-  },
-  presetChipActive: {
-    backgroundColor: colors.accentLight,
-  },
-  presetChipText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  presetChipTextActive: {
-    color: colors.accentDark,
-  },
   modalActions: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 4,
+    marginTop: 8,
+    marginBottom: 6,
   },
   modalDeleteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 4,
+    paddingHorizontal: 14,
+    height: 46,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.danger,
-    backgroundColor: colors.dangerBg,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
   },
   modalDeleteText: {
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.danger,
-    fontSize: 14,
-    fontWeight: '700',
   },
   modalSaveBtn: {
     backgroundColor: colors.accent,
+    height: 46,
     borderRadius: 12,
-    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalSaveText: {
-    color: colors.textLight,
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
+    color: colors.textLight,
+  },
+  catManageRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  catManageLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  catManageActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  catIconBtn: {
+    padding: 4,
   },
 });
