@@ -6,7 +6,7 @@ Aplikasi mobile kolaboratif *single source of truth* untuk persiapan pernikahan 
 
 ## 🌟 Status Implementasi Fitur
 
-Semua logika bisnis, kalkulasi finansial, modul data tamu & katering, pencatatan angpau/hadiah fisik, aturan kanonik gereja Katolik, validasi vendor, dan skema database **sudah selesai diimplementasikan 100%** dengan pendekatan *Test-Driven Development (TDD)* dan lulus seluruh **14 test suites (51 tests)**.
+Aplikasi berjalan di Android dan iOS dengan **Expo SDK 58 dan Expo Router**. Modul yang tersedia mencakup checklist pernikahan, anggaran, vendor, tamu, angpau, dokumen, dan Moodboard.
 
 ### 📋 Ringkasan Modul Terimplementasi
 
@@ -23,10 +23,22 @@ Semua logika bisnis, kalkulasi finansial, modul data tamu & katering, pencatatan
 | **9. Manajemen Tamu, RSVP & Pax Katering** | Pengelompokan tamu (pria, wanita, bersama), pelacakan status RSVP, dan kalkulator konfirmasi pax katering akurat (*confirmed attending pax*). | ✅ Selesai (Fase 2) | [`src/services/guestService.ts`](file:///c:/project/wedding-tracker/src/services/guestService.ts), [`src/types/guest.ts`](file:///c:/project/wedding-tracker/src/types/guest.ts) |
 | **10. Buku Besar Angpau & Hadiah Fisik** | Dedicated Gift Ledger memisahkan dana tunai/transfer dari kado fisik, rekap per penerima (Octa, Jenesia, keluarga), dan pelacakan status ucapan terima kasih. | ✅ Selesai (Fase 2) | [`src/services/giftService.ts`](file:///c:/project/wedding-tracker/src/services/giftService.ts), [`src/types/gift.ts`](file:///c:/project/wedding-tracker/src/types/gift.ts) |
 | **11. Kepatuhan Dokumen Kanonik Katolik** | Validasi aturan kanonik surat baptis terbaru (maksimal 180 hari / 6 bulan sebelum hari H), pelacakan berkas KPP & sipil, serta indikator kesiapan kepatuhan. | ✅ Selesai (Fase 2) | [`src/services/documentService.ts`](file:///c:/project/wedding-tracker/src/services/documentService.ts), [`src/types/document.ts`](file:///c:/project/wedding-tracker/src/types/document.ts) |
+| **12. Design System & UI Primitives** | Palet krem, hijau, dan cokelat dengan komponen seperti `Card`, `Header`, `ProgressBar`, `Badge`, dan `SegmentedControl`. | ✅ Selesai (Fase 3) | [`src/theme/`](src/theme/), [`src/components/common/`](src/components/common/) |
+| **13. Mobile UI Navigation (Expo Router)** | Lima tab utama untuk Ringkasan, Checklist, Anggaran, Tamu, dan Dokumen. | ✅ Selesai (Fase 3) | [`app/`](app/) |
+| **14. Moodboard & Referensi** | Galeri online untuk foto dan tautan inspirasi, palet warna, referensi vendor, dan ekspor brief PDF. | ✅ Terimplementasi | [`app/moodboard.tsx`](app/moodboard.tsx) |
 
 ---
 
 ## 🚀 Panduan Menjalankan & Mengecek Fitur
+
+### Menjalankan aplikasi
+
+```bash
+npm ci
+npm start
+```
+
+Buka proyek dengan Expo Go yang kompatibel dengan SDK 58. Gunakan `a` untuk membuka emulator Android atau `i` untuk membuka simulator iOS di macOS. Mode lokal tersedia tanpa akun Supabase. Moodboard memerlukan koneksi internet dan akun anggota workspace.
 
 ### 1. Menjalankan Demo Interaktif Fase 1 (MVP Inti)
 Menjalankan simulasi countdown hari H, pergeseran tugas kanonik, kalkulasi anggaran kas vs DP vendor, deteksi dini over-budget, dan jadwal timeline:
@@ -40,33 +52,30 @@ Menjalankan simulasi manajemen tamu & RSVP, kalkulasi pax katering resepsi, reka
 npm run demo:phase2
 ```
 
-**Output yang akan Anda lihat pada Demo Fase 2:**
-- **Manajemen Tamu & RSVP**: Estimasi kuota pax undangan vs realisasi pax hadir terkonfirmasi (angka pasti untuk konfirmasi porsi katering), serta pembagian sisi keluarga.
-- **Buku Besar Angpau (Gift Ledger)**: Total nominal uang tunai & transfer terkumpul, rekap penerimaan per mempelai/keluarga, daftar hadiah fisik (misal mesin kopi), dan pelacakan kartu ucapan terima kasih (*thank you notes*).
-- **Kepatuhan Dokumen Kanonik Katolik**: Pengecekan otomatis surat baptis (surat baptis terbit $\le$ 180 hari sebelum hari H dinyatakan sah; surat baptis $> 180$ hari otomatis ditandai kedaluwarsa dan wajib dicetak ulang di paroki asal), serta persentase kesiapan dokumen pernikahan.
+### 3. Menjalankan Demo Simulasi Mobile UI Fase 3 (Expo Router)
+Menjalankan simulasi tampilan dan navigasi lima layar utama aplikasi mobile.
+```bash
+npm run demo:ui
+```
+
+**Output yang akan Anda lihat pada Demo Fase 3 (Mobile UI):**
+- **Tema** menggunakan latar krem (`#F7F4ED`), teks gelap (`#222B24`), dan aksen hijau (`#365B47`).
+- **Tab 1 (Dashboard)**: Countdown hari H (10 Okt 2027), bar kemajuan, kartu anggaran & peringatan over-budget, rekap kontribusi Octa vs Jenesia.
+- **Tab 2 (Checklist)**: Filter kategori kanonik/KPP/sipil/liturgi, status tugas todo/done, prioritas, dan penanggung jawab (PIC).
+- **Tab 3 (Anggaran & Vendor)**: Pos anggaran per kategori, direktori vendor dengan status lifecycle, dan transaksi pembayaran dengan label pembayar.
+- **Tab 4 (Tamu & Angpau)**: Segmented switcher antara kalkulator konfirmasi pax katering resepsi vs buku besar angpau tunai/transfer & kado fisik serta status ucapan terima kasih.
+- **Tab 5 (Dokumen Kanonik)**: Indikator kelengkapan dokumen pernikahan, banner aturan kanonik Katolik surat baptis $\le$ 180 hari, dan status verifikasi berkas.
 
 ---
 
-### 3. Menjalankan Seluruh Pengujian Otomatis (Full Test Suite)
-Untuk memverifikasi keandalan seluruh fungsi dan logika matematis proyek:
+### 4. Menjalankan pengujian dan pemeriksaan TypeScript
+
 ```bash
 npm test
+npm exec -- tsc --noEmit
 ```
-Seluruh **14 test suites** (51 tests) akan dijalankan:
-- `tests/config/supabase.test.ts`
-- `tests/db/schema_validation.test.ts`
-- `tests/db/phase2_schema_validation.test.ts`
-- `tests/services/auth.test.ts`
-- `tests/services/budgetCalculator.test.ts`
-- `tests/services/checklistService.test.ts`
-- `tests/services/vendorService.test.ts`
-- `tests/services/dashboardService.test.ts`
-- `tests/services/notificationService.test.ts`
-- `tests/services/guestService.test.ts`
-- `tests/services/giftService.test.ts`
-- `tests/services/documentService.test.ts`
-- `tests/demo.test.ts`
-- `tests/phase2_demo.test.ts`
+
+Verifikasi terakhir mencakup **28 suite dan 104 tes**, termasuk skema database, sinkronisasi cloud, dan Moodboard.
 
 ---
 
@@ -78,15 +87,18 @@ Jika Anda ingin menghubungkan aplikasi ke instance Supabase Anda sendiri:
 1. Buka dashboard Supabase dan klik **New Project**.
 2. Masukkan nama project (misal: `wedding-tracker`) dan tentukan Database Password.
 
-### Langkah 2: Jalankan Migration SQL & Seed Data
-1. Masuk ke menu **SQL Editor** di dashboard Supabase proyek Anda.
-2. Buka file [`supabase/migrations/20261123000000_initial_schema.sql`](file:///c:/project/wedding-tracker/supabase/migrations/20261123000000_initial_schema.sql), salin isinya, tempel ke SQL Editor Supabase, lalu klik **Run**.
-3. Buka file [`supabase/migrations/20261123000001_phase2_schema.sql`](file:///c:/project/wedding-tracker/supabase/migrations/20261123000001_phase2_schema.sql), salin isinya, tempel ke SQL Editor Supabase, lalu klik **Run**.
-4. Buka file [`supabase/seed.sql`](file:///c:/project/wedding-tracker/supabase/seed.sql), salin isinya, tempel ke SQL Editor Supabase, lalu klik **Run**.
-   - Ini akan otomatis membuat akun Octa (`octaadsp@gmail.com`) dan Jenesia (`jenesia23@gmail.com`) dengan password `Admin123@`, workspace pernikahan bersama, seluruh templat tugas Katolik & pos anggaran awal.
+### Langkah 2. Terapkan migrasi database
+
+Untuk database baru, jalankan file berikut secara berurutan di **SQL Editor** Supabase. Untuk database yang sudah berjalan, terapkan hanya migrasi yang masih kurang.
+
+1. [Skema inti](supabase/migrations/20261123000000_initial_schema.sql)
+2. [Skema tamu, angpau, dan dokumen](supabase/migrations/20261123000001_phase2_schema.sql)
+3. [Skema Moodboard dan bucket `moodboard-assets`](supabase/migrations/20261125000000_moodboard_schema.sql)
+
+`supabase/seed.sql` menyediakan akun demo dengan kata sandi bawaan, workspace contoh, serta data checklist dan anggaran. Gunakan seed hanya pada database pengembangan yang terisolasi.
 
 ### Langkah 3: Konfigurasi Environment Variables
-Buat file `.env` di root direktori proyek:
+Buat file `.env` di direktori utama proyek.
 ```env
 EXPO_PUBLIC_SUPABASE_URL=https://<project-id>.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
@@ -134,7 +146,8 @@ wedding-tracker/
 ├── supabase/
 │   ├── migrations/
 │   │   ├── 20261123000000_initial_schema.sql  # DDL Skema MVP, RLS & Trigger
-│   │   └── 20261123000001_phase2_schema.sql   # DDL Tamu, Hadiah, Dokumen & Indeks
+│   │   ├── 20261123000001_phase2_schema.sql   # DDL Tamu, Hadiah, Dokumen & Indeks
+│   │   └── 20261125000000_moodboard_schema.sql # Moodboard dan Storage
 │   └── seed.sql                           # Seed Data Akun Octa & Jenesia & Templat
 ├── tests/                                 # Unit & Integration Tests (Jest)
 │   ├── config/

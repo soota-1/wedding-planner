@@ -18,9 +18,11 @@ export interface AuthState {
   session: any | null;
   activeWorkspace: Workspace | null;
   isAuthenticated: boolean;
+  isOfflineMode: boolean;
   setUser: (user: User | null) => void;
   setSession: (session: any | null) => void;
   setActiveWorkspace: (workspace: Workspace | null) => void;
+  enterOfflineMode: () => void;
   reset: () => void;
 }
 
@@ -29,8 +31,17 @@ export const useAuthStore = create<AuthState>((set) => ({
   session: null,
   activeWorkspace: null,
   isAuthenticated: false,
-  setUser: (user) => set({ user, isAuthenticated: !!user }),
+  isOfflineMode: false,
+  setUser: (user) => set({ user, isAuthenticated: !!user, isOfflineMode: false }),
   setSession: (session) => set({ session }),
   setActiveWorkspace: (workspace) => set({ activeWorkspace: workspace }),
-  reset: () => set({ user: null, session: null, activeWorkspace: null, isAuthenticated: false }),
+  enterOfflineMode: () => set({ isOfflineMode: true }),
+  reset: () =>
+    set({
+      user: null,
+      session: null,
+      activeWorkspace: null,
+      isAuthenticated: false,
+      isOfflineMode: false,
+    }),
 }));

@@ -59,4 +59,35 @@ describe('NotificationService scheduling', () => {
       })
     );
   });
+
+  it('schedules vendor meeting/fitting reminder with time and lead time', async () => {
+    const mockScheduler = jest.fn().mockResolvedValue('notif-vendor-1');
+    const result = await NotificationService.scheduleVendorReminder(
+      {
+        id: 'vs-1',
+        title: 'Fitting Gaun Perdana',
+        date: '25 Sep 2027',
+        time: '14:00',
+        isoDateTime: '2027-09-25T14:00:00',
+        reminderMinutesBefore: 60,
+      },
+      'Sanggar Rias & Gaun Pengantin',
+      mockScheduler
+    );
+
+    expect(result.scheduled).toBe(true);
+    expect(result.triggerLabel).toBe('1 jam sebelum jadwal');
+    expect(mockScheduler).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Pengingat Vendor: Sanggar Rias & Gaun Pengantin',
+        body: expect.stringContaining('Fitting Gaun Perdana pada 25 Sep 2027 pukul 14:00'),
+      })
+    );
+  });
+
+  it('triggers sendTestNotification using expo-notifications', async () => {
+    const res = await NotificationService.sendTestNotification(3);
+    expect(res.ok).toBe(true);
+    expect(res.message).toContain('3 detik');
+  });
 });
