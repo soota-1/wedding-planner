@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
     "target": "es2022",
-    "module": "commonjs",
     "lib": [
       "es2022"
     ],
@@ -10,7 +9,6 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node",
     "resolveJsonModule": true
   },
   "include": [
