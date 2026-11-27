@@ -224,7 +224,6 @@ export default function GuestsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Header
-          kicker="Resepsi & Hadiah"
           title="Tamu & Angpau"
           subtitle="Ketuk untuk ubah status • Tekan lama untuk edit/hapus"
           rightElement={

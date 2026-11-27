@@ -40,7 +40,7 @@ export function Card({ children, style, variant = 'default', onPress }: CardProp
     };
 
     return (
-      <Pressable onPress={onPress} onPressIn={handlePressIn} onPressOut={handlePressOut}>
+      <Pressable accessibilityRole="button" onPress={onPress} onPressIn={handlePressIn} onPressOut={handlePressOut}>
         <Animated.View style={[containerStyle, { transform: [{ scale: scaleAnim }] }]}>
           {children}
         </Animated.View>
@@ -63,10 +63,10 @@ const styles = StyleSheet.create({
   elevated: {
     shadowColor: colors.textPrimary,
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     elevation: 2,
-    borderColor: colors.border,
+    borderWidth: 0,
   },
   outlined: {
     backgroundColor: 'transparent',

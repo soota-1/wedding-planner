@@ -2,16 +2,22 @@ import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 
 describe('Design System Theme Tokens', () => {
-  it('defines refined minimalist editorial color tokens', () => {
-    expect(colors.bg).toBe('#F8F7F4');
-    expect(colors.accent).toBe('#9E5A47');
-    expect(colors.secondary).toBe('#B89242');
-    expect(colors.textPrimary).toBe('#111318');
-    expect(colors.cardBg).toBe('#FFFFFF');
-    expect(colors.border).toBe('#E9E6DF');
-    expect(colors.success).toBe('#236B48');
-    expect(colors.warning).toBe('#9A6012');
-    expect(colors.danger).toBe('#A83232');
+  it('keeps text and primary actions readable on their intended surfaces', () => {
+    const pairs = [
+      [colors.textPrimary, colors.bg],
+      [colors.textSecondary, colors.surfaceMuted],
+      [colors.textMuted, colors.bg],
+      [colors.accent, colors.accentLight],
+      [colors.textLight, colors.accent],
+      [colors.success, colors.successBg],
+      [colors.warning, colors.warningBg],
+      [colors.danger, colors.dangerBg],
+    ];
+
+    for (const [foreground, background] of pairs) {
+      const [lighter, darker] = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+      expect((lighter + 0.05) / (darker + 0.05)).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   it('defines standard spacing and border radius', () => {
@@ -23,3 +29,12 @@ describe('Design System Theme Tokens', () => {
     expect(spacing.borderRadius).toBe(12);
   });
 });
+
+function luminance(hex: string) {
+  const channels = [1, 3, 5].map((start) => {
+    const channel = parseInt(hex.slice(start, start + 2), 16) / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+
+  return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+}

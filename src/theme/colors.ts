@@ -1,37 +1,32 @@
 export const colors = {
-  // Editorial Warm Minimalist Canvas
-  bg: '#F8F7F4', // Clean Warm Alabaster
-  cardBg: '#FFFFFF', // Crisp White Surface
-  surfaceMuted: '#F1EFEA', // Soft Warm Stone
-  border: '#E9E6DF', // Ultra-subtle hairline border
-  borderDark: '#D6D1C7',
+  bg: '#F7F4ED',
+  cardBg: '#FFFDFA',
+  surfaceMuted: '#EEEAE0',
+  border: '#DDD8CA',
+  borderDark: '#C8C3B5',
 
-  // Restrained Wedding Brand Accents
-  accent: '#9E5A47', // Dusty Rosewood / Terracotta
-  accentLight: '#F6ECE9', // Soft Rose Tint
-  accentDark: '#783E2E',
+  accent: '#365B47',
+  accentLight: '#E3ECE1',
+  accentDark: '#233E32',
 
-  // Secondary Accents
-  secondary: '#B89242', // Brushed Champagne Gold
-  secondaryLight: '#FAF5E8',
+  secondary: '#795830',
+  secondaryLight: '#F3E9D7',
 
-  // High-Contrast Typography
-  textPrimary: '#111318', // Rich Obsidian Ink
-  textSecondary: '#646873', // Refined Slate
-  textMuted: '#9A9EA8',
+  textPrimary: '#222B24',
+  textSecondary: '#4F5A50',
+  textMuted: '#626B60',
   textLight: '#FFFFFF',
 
-  // Restrained Semantic Status
-  success: '#236B48', // Deep Forest Emerald
+  success: '#236B48',
   successBg: '#ECF5F0',
-  warning: '#9A6012', // Muted Ochre Bronze
+  warning: '#87530F',
   warningBg: '#FAF3E6',
-  danger: '#A83232', // Muted Crimson
+  danger: '#A83232',
   dangerBg: '#FBECEC',
-  info: '#2B5B84', // Steel Blue
+  info: '#2B5B84',
   infoBg: '#EDF3F8',
-  neutral: '#F1EFEA',
-  neutralDark: '#E2DFD7',
+  neutral: '#EEEAE0',
+  neutralDark: '#E2DED4',
 };
 
 export type ColorKey = keyof typeof colors;

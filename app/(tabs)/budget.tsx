@@ -215,17 +215,17 @@ export default function BudgetScreen() {
         setSelectedVendorForDetail((prev) =>
           prev
             ? {
-                ...prev,
-                name: vendorName.trim(),
-                category: vendorCategory.trim() || 'Lainnya',
-                contractValue: contract,
-                status: vendorStatus,
-                contactPerson: vendorContact.trim() || 'PIC',
-                phone: vendorPhone.trim() || undefined,
-                email: vendorEmail.trim() || undefined,
-                socialMedia: vendorSocialMedia.trim() || undefined,
-                notes: vendorNotes.trim() || undefined,
-              }
+              ...prev,
+              name: vendorName.trim(),
+              category: vendorCategory.trim() || 'Lainnya',
+              contractValue: contract,
+              status: vendorStatus,
+              contactPerson: vendorContact.trim() || 'PIC',
+              phone: vendorPhone.trim() || undefined,
+              email: vendorEmail.trim() || undefined,
+              socialMedia: vendorSocialMedia.trim() || undefined,
+              notes: vendorNotes.trim() || undefined,
+            }
             : null
         );
       }
@@ -370,7 +370,6 @@ export default function BudgetScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Header
-          kicker="Finansial Pasangan"
           title="Anggaran & Vendor"
           subtitle={`Sisa liabilitas kontrak Rp ${(remainingLiability / 1000000).toFixed(0)} Jt`}
           rightElement={
@@ -499,15 +498,15 @@ export default function BudgetScreen() {
                             v.status === 'booked'
                               ? 'Booked'
                               : v.status === 'completed'
-                              ? 'Selesai'
-                              : 'Shortlist'
+                                ? 'Selesai'
+                                : 'Shortlist'
                           }
                           variant={
                             v.status === 'booked'
                               ? 'success'
                               : v.status === 'completed'
-                              ? 'neutral'
-                              : 'warning'
+                                ? 'neutral'
+                                : 'warning'
                           }
                         />
                       </View>
@@ -578,8 +577,8 @@ export default function BudgetScreen() {
                           tx.paidBy === 'groom'
                             ? 'Octa'
                             : tx.paidBy === 'bride'
-                            ? 'Jenesia'
-                            : 'Keluarga'
+                              ? 'Jenesia'
+                              : 'Keluarga'
                         }
                         variant="accent"
                       />
@@ -837,7 +836,7 @@ export default function BudgetScreen() {
                     <TouchableOpacity
                       activeOpacity={0.8}
                       onPress={() => {
-                        Linking.openURL(`mailto:${selectedVendorForDetail.email}`).catch(() => {});
+                        Linking.openURL(`mailto:${selectedVendorForDetail.email}`).catch(() => { });
                       }}
                       style={[styles.contactActionBtn, { backgroundColor: '#4285F4' }]}
                     >
@@ -851,7 +850,7 @@ export default function BudgetScreen() {
                       activeOpacity={0.8}
                       onPress={() => {
                         const igHandle = selectedVendorForDetail.socialMedia!.replace('@', '');
-                        Linking.openURL(`https://instagram.com/${igHandle}`).catch(() => {});
+                        Linking.openURL(`https://instagram.com/${igHandle}`).catch(() => { });
                       }}
                       style={[styles.contactActionBtn, { backgroundColor: '#E1306C' }]}
                     >
@@ -884,8 +883,8 @@ export default function BudgetScreen() {
                             pct === 100
                               ? 'Lunas 100%'
                               : selectedVendorForDetail.status === 'booked'
-                              ? 'Deal Kontrak'
-                              : 'Tahap Penjajakan'
+                                ? 'Deal Kontrak'
+                                : 'Tahap Penjajakan'
                           }
                           variant={pct === 100 ? 'success' : 'accent'}
                         />

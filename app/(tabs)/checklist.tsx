@@ -11,7 +11,6 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
-  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -293,7 +292,6 @@ export default function ChecklistScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Header
-          kicker="Persiapan Nikah"
           title="Checklist"
           subtitle={`${completedCount} dari ${tasks.length} langkah selesai`}
           rightElement={
@@ -308,28 +306,18 @@ export default function ChecklistScreen() {
           }
         />
 
-        {/* Visual Progress Hero Card */}
-        <FadeInView delay={20}>
-          <Card variant="elevated" style={styles.progressHeroCard}>
-            <View style={styles.progressHeroRow}>
-              <Image
-                source={require('../../assets/images/onboarding-1.jpg')}
-                style={styles.heroThumb}
-                resizeMode="cover"
-              />
-              <View style={styles.progressHeroInfo}>
-                <View style={styles.progressHeroTop}>
-                  <Text style={styles.progressHeroTitle}>Kesiapan Langkah</Text>
-                  <Text style={styles.progressHeroPercent}>{progressRatio}%</Text>
-                </View>
-                <ProgressBar progress={progressRatio} height={7} style={{ marginVertical: 8 }} />
-                <Text style={styles.progressHeroSub}>
-                  {completedCount} dari {tasks.length} langkah selesai
-                </Text>
-              </View>
-            </View>
-          </Card>
-        </FadeInView>
+        <View
+          style={styles.progressSummary}
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel="Progres checklist"
+          accessibilityValue={{ min: 0, max: 100, now: progressRatio }}
+        >
+          <View style={styles.progressTrack}>
+            <ProgressBar progress={progressRatio} height={5} />
+          </View>
+          <Text style={styles.progressPercent}>{progressRatio}%</Text>
+        </View>
 
         {/* Minimalist Search Input */}
         <View style={styles.searchContainer}>
@@ -944,43 +932,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textLight,
   },
-  progressHeroCard: {
-    padding: 14,
-    marginBottom: spacing.md,
-  },
-  progressHeroRow: {
+  progressSummary: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: spacing.md,
+    marginBottom: spacing.lg,
   },
-  heroThumb: {
-    width: 58,
-    height: 58,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  progressHeroInfo: {
+  progressTrack: {
     flex: 1,
   },
-  progressHeroTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  progressHeroTitle: {
+  progressPercent: {
     fontSize: 14,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  progressHeroPercent: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
     color: colors.accent,
-  },
-  progressHeroSub: {
-    fontSize: 11,
-    color: colors.textSecondary,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -995,7 +960,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    height: 40,
+    minHeight: 48,
     fontSize: 13,
     color: colors.textPrimary,
   },

@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     backgroundColor: colors.surfaceMuted,
-    borderRadius: spacing.borderRadiusPill,
+    borderRadius: spacing.borderRadius,
     padding: 3,
     marginBottom: spacing.md,
     position: 'relative',
@@ -86,17 +86,13 @@ const styles = StyleSheet.create({
     top: 3,
     bottom: 3,
     left: 3,
-    backgroundColor: colors.cardBg,
-    borderRadius: spacing.borderRadiusPill,
-    shadowColor: colors.textPrimary,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: colors.accentDark,
+    borderRadius: spacing.borderRadius - 3,
   },
   segment: {
     flex: 1,
-    paddingVertical: 9,
+    minHeight: 44,
+    paddingVertical: 8,
     paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
@@ -109,6 +105,6 @@ const styles = StyleSheet.create({
   },
   textSelected: {
     fontWeight: '600',
-    color: colors.textPrimary,
+    color: colors.textLight,
   },
 });

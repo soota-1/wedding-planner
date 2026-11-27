@@ -52,6 +52,8 @@ const styles = StyleSheet.create({
     paddingRight: spacing.md,
   },
   chip: {
+    minHeight: 44,
+    justifyContent: 'center',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: spacing.borderRadiusPill,
@@ -60,8 +62,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   chipActive: {
-    backgroundColor: colors.textPrimary,
-    borderColor: colors.textPrimary,
+    backgroundColor: colors.accentLight,
+    borderColor: colors.accent,
   },
   chipText: {
     fontSize: 13,
@@ -69,7 +71,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   chipTextActive: {
-    color: colors.textLight,
+    color: colors.accentDark,
     fontWeight: '600',
   },
 });

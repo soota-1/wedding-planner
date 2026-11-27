@@ -17,14 +17,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { differenceInCalendarDays, format } from 'date-fns';
+import { id } from 'date-fns/locale';
 import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 import { Card } from '../../src/components/common/Card';
 import { Header } from '../../src/components/common/Header';
-import { StatCard } from '../../src/components/common/StatCard';
 import { ProgressBar } from '../../src/components/common/ProgressBar';
 import { Badge } from '../../src/components/common/Badge';
-import { FadeInView } from '../../src/components/common/FadeInView';
 import { SegmentedControl } from '../../src/components/common/SegmentedControl';
 import { useWeddingStore } from '../../src/stores/useWeddingStore';
 import { useAuthStore } from '../../src/stores/useAuthStore';
@@ -146,7 +145,7 @@ export default function DashboardScreen() {
   const weddingDate = new Date(profile.weddingDate);
   const safeWeddingDate = isNaN(weddingDate.getTime()) ? new Date('2027-10-10T00:00:00.000Z') : weddingDate;
   const daysRemaining = Math.max(0, differenceInCalendarDays(safeWeddingDate, new Date()));
-  const formattedWeddingDate = format(safeWeddingDate, 'dd MMM yyyy');
+  const formattedWeddingDate = format(safeWeddingDate, 'd MMMM yyyy', { locale: id });
 
   // Checklist metrics
   const totalTasks = tasks.length;
@@ -194,14 +193,14 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Header
-          kicker="Sakramen & Resepsi"
           title={`${profile.groomName} & ${profile.brideName}`}
-          subtitle={`${formattedWeddingDate} • ${profile.parishName}`}
+          subtitle={profile.parishName}
           rightElement={
             <TouchableOpacity
               onPress={openSettings}
               activeOpacity={0.75}
               style={styles.settingsButton}
+              accessibilityRole="button"
               accessibilityLabel="Pengaturan Pernikahan"
             >
               <Ionicons name="settings-outline" size={20} color={colors.textPrimary} />
@@ -209,93 +208,122 @@ export default function DashboardScreen() {
           }
         />
 
-        {/* 1. Visual Hero Countdown Card */}
-        <FadeInView delay={40}>
-          <Card variant="elevated" style={styles.heroCard}>
-            <View style={styles.heroTopRow}>
-              <Image
-                source={require('../../assets/images/onboarding-1.jpg')}
-                style={styles.heroCoupleImage}
-                resizeMode="cover"
-              />
-              <View style={styles.countdownBlock}>
-                <Text style={styles.countdownNumber}>{daysRemaining}</Text>
-                <Text style={styles.countdownLabel}>Hari Menuju Hari H</Text>
-              </View>
-              <View style={styles.verticalDivider} />
-              <View style={styles.heroMetricsColumn}>
-                <View style={styles.heroMiniMetric}>
-                  <Text style={styles.heroMiniLabel}>Checklist</Text>
-                  <Text style={styles.heroMiniValue}>{progressPercent}% Siap</Text>
-                </View>
-                <View style={styles.heroMiniMetric}>
-                  <Text style={styles.heroMiniLabel}>Tamu Hadir</Text>
-                  <Text style={styles.heroMiniValue}>{confirmedAttendingPax} Pax Fix</Text>
-                </View>
-              </View>
-            </View>
-          </Card>
-        </FadeInView>
+        <View style={styles.weddingCard}>
+          <View style={styles.weddingDetails}>
+            <Text style={styles.weddingDate}>{formattedWeddingDate}</Text>
+            <Text style={styles.countdownNumber}>{daysRemaining}</Text>
+            <Text style={styles.countdownLabel}>hari menuju pernikahan</Text>
+          </View>
+          <Image
+            source={require('../../assets/images/onboarding-1.jpg')}
+            style={styles.weddingArt}
+            resizeMode="contain"
+            accessible={false}
+          />
+        </View>
 
         {/* Alert Banner if Canonical Docs Expired */}
         {expiredDocsCount > 0 ? (
-          <FadeInView delay={70}>
-            <Card onPress={() => router.push('/documents')} style={styles.alertCard}>
-              <View style={styles.alertRow}>
-                <Ionicons name="alert-circle-outline" size={18} color={colors.warning} />
-                <Text style={styles.alertText}>
-                  {expiredDocsCount} dokumen kanonik kedaluwarsa perlu diperbarui
-                </Text>
-                <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
-              </View>
-            </Card>
-          </FadeInView>
-        ) : null}
-
-        {/* 2. Smooth Progress Card */}
-        <FadeInView delay={100}>
-          <Card onPress={() => router.push('/checklist')}>
-            <View style={styles.cardHeaderRow}>
-              <View style={styles.rowTitleGroup}>
-                <Ionicons name="checkmark-circle-outline" size={18} color={colors.accent} />
-                <Text style={styles.sectionTitle}>Progres Persiapan</Text>
-              </View>
-              <Text style={styles.percentText}>{progressPercent}%</Text>
-            </View>
-            <ProgressBar progress={progressPercent} height={7} style={styles.progressBar} />
-            <View style={styles.cardFooterLinkRow}>
-              <Text style={styles.mutedSubtext}>
-                {completedTasks} dari {totalTasks} tugas utama selesai
+          <Card onPress={() => router.push('/documents')} style={styles.alertCard}>
+            <View style={styles.alertRow}>
+              <Ionicons name="alert-circle-outline" size={20} color={colors.warning} />
+              <Text style={styles.alertText}>
+                {expiredDocsCount} dokumen kanonik kedaluwarsa perlu diperbarui
               </Text>
-              <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+              <Ionicons name="chevron-forward" size={16} color={colors.warning} />
             </View>
           </Card>
-        </FadeInView>
+        ) : null}
 
-        {/* 3. Financial Health Card */}
-        <FadeInView delay={160}>
-          <Card onPress={() => router.push('/budget')}>
-            <View style={styles.cardHeaderRow}>
-              <View style={styles.rowTitleGroup}>
-                <Ionicons name="wallet-outline" size={18} color={colors.accent} />
-                <Text style={styles.sectionTitle}>Ringkasan Anggaran</Text>
-              </View>
-              <Badge
-                label={isOverBudget ? `Over Rp ${(overBudgetAmount / 1000000).toFixed(0)} Jt` : 'Sesuai Target'}
-                variant={isOverBudget ? 'warning' : 'success'}
-              />
+        <View style={styles.overview}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={() => router.push('/checklist')}
+            style={styles.overviewItem}
+            activeOpacity={0.7}
+          >
+            <View style={styles.overviewHeading}>
+              <Text style={styles.overviewLabel}>Checklist</Text>
+              <Ionicons name="chevron-forward" size={15} color={colors.accent} />
             </View>
+            <Text style={styles.overviewValue}>{completedTasks} dari {totalTasks}</Text>
+            <Text style={styles.mutedSubtext}>tugas selesai</Text>
+            <ProgressBar progress={progressPercent} height={4} style={styles.progressBar} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={() => router.push('/guests')}
+            style={styles.overviewItem}
+            activeOpacity={0.7}
+          >
+            <View style={styles.overviewHeading}>
+              <Text style={styles.overviewLabel}>Tamu</Text>
+              <Ionicons name="chevron-forward" size={15} color={colors.accent} />
+            </View>
+            <Text style={styles.overviewValue}>{confirmedAttendingPax}</Text>
+            <Text style={styles.mutedSubtext}>konfirmasi hadir</Text>
+          </TouchableOpacity>
+        </View>
 
-            <View style={styles.statGrid}>
-              <StatCard
-                label="Target Anggaran"
-                value={`Rp ${(targetBudget / 1000000).toFixed(0)} Jt`}
-              />
-              <StatCard
-                label="Kas Terbayar"
-                value={`Rp ${(cashSpent / 1000000).toFixed(0)} Jt`}
-                variant="highlight"
-              />
+        <View style={styles.section}>
+          <View style={styles.sectionHeading}>
+            <Text style={styles.sectionTitle} accessibilityRole="header">Agenda terdekat</Text>
+            <TouchableOpacity
+              onPress={() => router.push('/timeline')}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              style={styles.sectionAction}
+            >
+              <Text style={styles.linkText}>Lihat linimasa</Text>
+              <Ionicons name="arrow-forward" size={15} color={colors.accent} />
+            </TouchableOpacity>
+          </View>
+          {upcomingTasks.length === 0 ? (
+            <Text style={styles.emptyAgenda}>
+              {totalTasks ? 'Semua tugas telah selesai.' : 'Belum ada tugas di checklist.'}
+            </Text>
+          ) : (
+            upcomingTasks.map((task) => (
+              <TouchableOpacity
+                key={task.id}
+                onPress={() => router.push('/checklist')}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                style={styles.agendaRow}
+              >
+                <View style={styles.agendaLeft}>
+                  <Text style={styles.agendaDate}>{task.dueDate}</Text>
+                  <Text style={styles.agendaTitle}>{task.title}</Text>
+                </View>
+                <Badge
+                  label={`H${task.offsetDays > 0 ? '+' : ''}${task.offsetDays}`}
+                  variant={task.priority === 'critical' ? 'danger' : 'neutral'}
+                />
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, styles.standaloneHeading]} accessibilityRole="header">
+            Ringkasan anggaran
+          </Text>
+          <Card onPress={() => router.push('/budget')}>
+            {isOverBudget ? (
+              <Text style={styles.budgetWarning}>
+                Melebihi target Rp {overBudgetAmount.toLocaleString('id-ID')}
+              </Text>
+            ) : null}
+
+            <View style={styles.budgetTotals}>
+              <View style={styles.budgetTotal}>
+                <Text style={styles.overviewLabel}>Sudah dibayar</Text>
+                <Text style={styles.budgetValue}>Rp {cashSpent.toLocaleString('id-ID')}</Text>
+              </View>
+              <View style={styles.budgetTotal}>
+                <Text style={styles.overviewLabel}>Target anggaran</Text>
+                <Text style={styles.budgetValue}>Rp {targetBudget.toLocaleString('id-ID')}</Text>
+              </View>
             </View>
 
             <View style={styles.ledgerList}>
@@ -318,68 +346,28 @@ export default function DashboardScreen() {
                 <Text style={styles.ledgerValue}>Rp {familyContrib.toLocaleString('id-ID')}</Text>
               </View>
             </View>
-          </Card>
-        </FadeInView>
-
-        {/* 4. Upcoming Deadlines */}
-        <FadeInView delay={220}>
-          <Card>
-            <View style={styles.cardHeaderRow}>
-              <View style={styles.rowTitleGroup}>
-                <Ionicons name="calendar-outline" size={18} color={colors.accent} />
-                <Text style={styles.sectionTitle}>Agenda Terdekat</Text>
-              </View>
-              <TouchableOpacity onPress={() => router.push('/timeline')} activeOpacity={0.7}>
-                <Text style={styles.linkText}>Lihat Semua</Text>
-              </TouchableOpacity>
+            <View style={styles.cardFooterLinkRow}>
+              <Text style={styles.linkText}>Buka anggaran</Text>
+              <Ionicons name="arrow-forward" size={16} color={colors.accent} />
             </View>
-
-            {upcomingTasks.length === 0 ? (
-              <Text style={styles.mutedSubtext}>Semua tugas telah diselesaikan!</Text>
-            ) : (
-              upcomingTasks.map((t, idx) => (
-                <TouchableOpacity
-                  key={t.id}
-                  onPress={() => router.push('/checklist')}
-                  activeOpacity={0.7}
-                  style={[styles.agendaRow, idx === upcomingTasks.length - 1 && styles.agendaRowLast]}
-                >
-                  <View style={styles.agendaLeft}>
-                    <Text style={styles.agendaTitle} numberOfLines={1}>
-                      {t.title}
-                    </Text>
-                    <Text style={styles.agendaDate}>{t.dueDate}</Text>
-                  </View>
-                  <View style={styles.agendaRight}>
-                    <Badge
-                      label={`H${t.offsetDays}`}
-                      variant={t.priority === 'critical' ? 'danger' : 'warning'}
-                    />
-                    <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
-                  </View>
-                </TouchableOpacity>
-              ))
-            )}
           </Card>
-        </FadeInView>
+        </View>
 
-        {/* 5. Moodboard & Visual References Card */}
-        <FadeInView delay={260}>
-          <Card onPress={() => router.push('/moodboard')}>
-            <View style={styles.cardHeaderRow}>
-              <View style={styles.rowTitleGroup}>
-                <Ionicons name="images-outline" size={18} color={colors.accent} />
-                <Text style={styles.sectionTitle}>Moodboard & Referensi</Text>
-              </View>
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, styles.standaloneHeading]} accessibilityRole="header">
+            Moodboard & Referensi
+          </Text>
+          <Card onPress={() => router.push('/moodboard')} style={styles.moodCard}>
+            {moodboardItems.some((item) => item.isFinal) ? (
               <Badge
-                label={`${moodboardItems.filter((m) => m.isFinal).length} Final ★`}
+                label={`${moodboardItems.filter((m) => m.isFinal).length} final`}
                 variant="accent"
               />
-            </View>
+            ) : null}
             <Text style={styles.mutedSubtext}>
               {moodboardItems.length === 0
-                ? 'Simpan inspirasi dekorasi, busana, MUA & foto agar mudah dikirim ke vendor'
-                : `${moodboardItems.length} inspirasi visual tersimpan & tersinkron online`}
+                ? 'Simpan inspirasi dekorasi, busana, rias, dan foto untuk dibagikan ke vendor.'
+                : `${moodboardItems.length} referensi tersimpan`}
             </Text>
             {moodboardItems.length > 0 ? (
               <View style={styles.moodPreviewRow}>
@@ -394,12 +382,12 @@ export default function DashboardScreen() {
                 )}
               </View>
             ) : null}
-            <View style={[styles.cardFooterLinkRow, { marginTop: 10 }]}>
-              <Text style={styles.linkText}>Buka Galeri Moodboard</Text>
-              <Ionicons name="chevron-forward" size={14} color={colors.accent} />
+            <View style={styles.cardFooterLinkRow}>
+              <Text style={styles.linkText}>Buka moodboard</Text>
+              <Ionicons name="arrow-forward" size={16} color={colors.accent} />
             </View>
           </Card>
-        </FadeInView>
+        </View>
       </ScrollView>
 
       {/* Workspace Settings Modal */}
@@ -605,81 +593,66 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
   },
   content: {
-    paddingHorizontal: spacing.md,
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 680,
+    paddingHorizontal: 20,
     paddingBottom: spacing.xl,
   },
   settingsButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: colors.cardBg,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroCard: {
-    paddingVertical: 20,
-    paddingHorizontal: 18,
-  },
-  heroTopRow: {
+  weddingCard: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-  },
-  heroCoupleImage: {
-    width: 58,
-    height: 58,
+    justifyContent: 'space-between',
+    backgroundColor: colors.accentDark,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginRight: 12,
+    gap: spacing.md,
+    padding: 18,
+    marginBottom: spacing.md,
   },
-  countdownBlock: {
-    flex: 1,
-    paddingRight: spacing.xs,
+  weddingArt: {
+    width: '34%',
+    maxWidth: 142,
+    aspectRatio: 1,
+    borderRadius: 10,
+  },
+  weddingDetails: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 140,
+  },
+  weddingDate: {
+    color: colors.accentLight,
+    fontSize: 14,
+    fontWeight: '600',
   },
   countdownNumber: {
-    fontSize: 42,
-    fontWeight: '700',
-    color: colors.accent,
-    letterSpacing: -1.5,
+    fontSize: 58,
+    fontWeight: '600',
+    color: colors.textLight,
+    letterSpacing: -1.7,
     fontVariant: ['tabular-nums'],
-    lineHeight: 46,
+    lineHeight: 66,
   },
   countdownLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    marginTop: 4,
-  },
-  verticalDivider: {
-    width: 1,
-    height: 54,
-    backgroundColor: colors.border,
-    marginHorizontal: spacing.md,
-  },
-  heroMetricsColumn: {
-    flex: 1,
-    gap: 10,
-  },
-  heroMiniMetric: {
-    justifyContent: 'center',
-  },
-  heroMiniLabel: {
-    fontSize: 11,
-    color: colors.textMuted,
-    fontWeight: '500',
-  },
-  heroMiniValue: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginTop: 1,
+    fontSize: 14,
+    color: colors.accentLight,
+    lineHeight: 19,
   },
   alertCard: {
-    borderLeftWidth: 3,
-    borderLeftColor: colors.warning,
-    paddingVertical: 11,
+    backgroundColor: colors.warningBg,
+    borderColor: colors.warning,
+    paddingVertical: 12,
     paddingHorizontal: 14,
   },
   alertRow: {
@@ -689,48 +662,111 @@ const styles = StyleSheet.create({
   },
   alertText: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
-    color: colors.textPrimary,
+    color: colors.warning,
   },
-  cardHeaderRow: {
+  overview: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  overviewItem: {
+    flexGrow: 1,
+    flexBasis: 128,
+    backgroundColor: colors.accentLight,
+    borderRadius: spacing.borderRadius,
+    padding: 14,
+  },
+  overviewHeading: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    gap: spacing.xs,
   },
-  rowTitleGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  overviewLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    flexShrink: 1,
   },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
+  overviewValue: {
+    fontSize: 23,
+    fontWeight: '600',
     color: colors.textPrimary,
-  },
-  percentText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.accent,
     fontVariant: ['tabular-nums'],
+    marginTop: spacing.xs,
   },
   progressBar: {
-    marginBottom: 10,
+    marginTop: spacing.sm,
+    backgroundColor: colors.cardBg,
+  },
+  section: {
+    marginBottom: spacing.md,
+  },
+  sectionHeading: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    columnGap: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  standaloneHeading: {
+    marginBottom: spacing.sm,
+  },
+  sectionTitle: {
+    fontSize: 21,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    letterSpacing: -0.45,
+  },
+  sectionAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 48,
+    gap: spacing.xs,
   },
   cardFooterLinkRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
   },
   mutedSubtext: {
-    fontSize: 12,
+    fontSize: 13,
+    lineHeight: 19,
     color: colors.textSecondary,
   },
-  statGrid: {
+  budgetTotals: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 14,
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  budgetTotal: {
+    flexGrow: 1,
+    flexBasis: 118,
+    gap: spacing.xs,
+  },
+  budgetValue: {
+    fontSize: 17,
+    color: colors.textPrimary,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  budgetWarning: {
+    color: colors.warning,
+    fontSize: 13,
+    fontWeight: '600',
+    backgroundColor: colors.warningBg,
+    borderRadius: spacing.borderRadiusSm,
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.md,
   },
   ledgerList: {
     borderTopWidth: 1,
@@ -739,6 +775,8 @@ const styles = StyleSheet.create({
   },
   ledgerRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 6,
@@ -749,7 +787,8 @@ const styles = StyleSheet.create({
   ledgerLabel: {
     fontSize: 13,
     color: colors.textSecondary,
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
     paddingRight: 8,
   },
   ledgerValue: {
@@ -767,32 +806,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 11,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  agendaRowLast: {
-    borderBottomWidth: 0,
-    paddingBottom: 2,
+    paddingVertical: 12,
+    minHeight: 60,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   agendaLeft: {
     flex: 1,
     paddingRight: 10,
   },
   agendaTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: colors.textPrimary,
+    marginTop: 3,
   },
   agendaDate: {
     fontSize: 12,
     color: colors.textSecondary,
-    marginTop: 2,
   },
-  agendaRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  emptyAgenda: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    paddingVertical: spacing.sm,
   },
   // Modal styles
   modalOverlay: {
@@ -918,8 +954,13 @@ const styles = StyleSheet.create({
   },
   moodPreviewRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginTop: 10,
+  },
+  moodCard: {
+    backgroundColor: colors.secondaryLight,
+    gap: spacing.xs,
   },
   moodPreviewThumb: {
     width: 52,

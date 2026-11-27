@@ -139,7 +139,6 @@ export default function DocumentsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Header
-          kicker="Kanonik & Legal"
           title="Dokumen"
           subtitle={`${verifiedCount} dari ${docs.length} berkas siap`}
           rightElement={

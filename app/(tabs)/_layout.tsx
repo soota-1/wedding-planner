@@ -1,13 +1,23 @@
 import React from 'react';
-import { Platform } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../src/theme/colors';
 
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
+function tabIcon(active: IconName, inactive: IconName) {
+  return ({ focused, color }: { focused: boolean; color: string }) => (
+    <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
+      <Ionicons name={focused ? active : inactive} size={20} color={color} />
+    </View>
+  );
+}
+
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
-  const bottomPadding = Platform.OS === 'ios' ? Math.max(insets.bottom, 12) : 10;
+  const bottomPadding = Math.max(insets.bottom, 8);
 
   return (
     <Tabs
@@ -17,21 +27,16 @@ export default function TabsLayout() {
           backgroundColor: colors.cardBg,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: 54 + bottomPadding,
+          height: 60 + bottomPadding,
           paddingBottom: bottomPadding,
           paddingTop: 6,
-          shadowColor: colors.textPrimary,
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.03,
-          shadowRadius: 8,
-          elevation: 4,
         },
-        tabBarActiveTintColor: colors.accent,
+        tabBarActiveTintColor: colors.accentDark,
         tabBarInactiveTintColor: colors.textMuted,
+        tabBarLabelPosition: 'below-icon',
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '600',
-          marginTop: 2,
         },
       }}
     >
@@ -40,9 +45,7 @@ export default function TabsLayout() {
         options={{
           title: 'Ringkasan',
           tabBarLabel: 'Ringkasan',
-          tabBarIcon: ({ focused, color }) => (
-            <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
-          ),
+          tabBarIcon: tabIcon('home', 'home-outline'),
         }}
       />
       <Tabs.Screen
@@ -50,9 +53,7 @@ export default function TabsLayout() {
         options={{
           title: 'Checklist',
           tabBarLabel: 'Checklist',
-          tabBarIcon: ({ focused, color }) => (
-            <Ionicons name={focused ? 'checkbox' : 'checkbox-outline'} size={22} color={color} />
-          ),
+          tabBarIcon: tabIcon('checkbox', 'checkbox-outline'),
         }}
       />
       <Tabs.Screen
@@ -60,9 +61,7 @@ export default function TabsLayout() {
         options={{
           title: 'Anggaran',
           tabBarLabel: 'Anggaran',
-          tabBarIcon: ({ focused, color }) => (
-            <Ionicons name={focused ? 'wallet' : 'wallet-outline'} size={22} color={color} />
-          ),
+          tabBarIcon: tabIcon('wallet', 'wallet-outline'),
         }}
       />
       <Tabs.Screen
@@ -70,9 +69,7 @@ export default function TabsLayout() {
         options={{
           title: 'Tamu & Kado',
           tabBarLabel: 'Tamu',
-          tabBarIcon: ({ focused, color }) => (
-            <Ionicons name={focused ? 'people' : 'people-outline'} size={22} color={color} />
-          ),
+          tabBarIcon: tabIcon('people', 'people-outline'),
         }}
       />
       <Tabs.Screen
@@ -80,11 +77,22 @@ export default function TabsLayout() {
         options={{
           title: 'Dokumen',
           tabBarLabel: 'Dokumen',
-          tabBarIcon: ({ focused, color }) => (
-            <Ionicons name={focused ? 'document-text' : 'document-text-outline'} size={22} color={color} />
-          ),
+          tabBarIcon: tabIcon('document-text', 'document-text-outline'),
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabIcon: {
+    width: 46,
+    height: 27,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabIconActive: {
+    backgroundColor: colors.accentLight,
+  },
+});
